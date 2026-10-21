@@ -1,0 +1,59 @@
+dist:
+  name: otel-transparency-collector
+  description: "Custom OpenTelemetry Collector distribution"
+  otelcol_version: "0.80.0"
+  output_path: /tmp/otelcol
+  version: "0.1.0"
+  go: "/usr/local/bin/go" # On MacOS, installed with `brew`.
+
+receivers:
+  - gomod:
+      go.opentelemetry.io/collector/receiver/otlpreceiver v0.80.0
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.80.0
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.80.0
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.80.0
+
+extensions:
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.80.0
+  - gomod:
+      go.opentelemetry.io/collector/extension/ballastextension v0.80.0
+
+processors:
+  - import: github.com/akkbng/otel-transparency-collector
+    gomod: github.com/akkbng/otel-transparency-collector main
+    name: transparencyprocessor
+  - gomod:
+      go.opentelemetry.io/collector/processor/batchprocessor v0.80.0
+  - gomod:
+      go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.80.0
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.80.0
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/processor/spanmetricsprocessor v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/servicegraphprocessor v0.80.0
+  #- gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.80.0
+
+
+replaces:
+  - github.com/akkbng/otel-transparency-collector => /build # Set up to be used by Dockerfile
+
+exporters:
+  - gomod:
+      go.opentelemetry.io/collector/exporter/loggingexporter v0.80.0
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/exporter/jaegerexporter v0.80.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.80.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.80.0
+
+
+connectors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/servicegraphconnector v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.80.0
