@@ -1,3 +1,5 @@
+// Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 # One repetition of the sampling experiment. Usage (from the repository root):
 #   experiments/run_experiment.sh RUN_ID [DURATION_S=300] [USERS=100] [SPAWN_RATE=10]
 # Requires: the shop running with OTEL_COLLECTOR_HOST=fanout (see experiments/README.md), python3.

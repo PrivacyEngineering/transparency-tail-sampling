@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Minimal stand-in for the demo's featureflagservice (Elixir + Postgres), which is not deployed in the
 trimmed setup. Answers every GetFlag with enabled=false (= all failure-injection flags off, the demo default).
 Runs inside the recommendationservice image, which already ships grpcio and the generated demo stubs."""

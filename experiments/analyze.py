@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Analyse one or more experiment runs (experiments/raw/<run_id>) and write tidy CSVs + JSON summary.
 
 Usage: python analyze.py --raw experiments/raw --out experiments/results RUN_ID [RUN_ID ...]

@@ -1,3 +1,5 @@
+// Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+
 package sampling
 
 // Tests added for the reproducibility artifact (not part of the thesis code). They pin down the

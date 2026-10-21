@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 # One repetition of experiment v2. Usage (from the repository root):
 #   experiments/v2/run_v2.sh RUN_ID [DURATION_S=300] [USERS=100] [SPAWN_RATE=10]
 # Env: TAILPROB_PCT (default 30), EXPERIMENT_TILT (default ../tilt/tilt.corrected.json, relative to deploy/),

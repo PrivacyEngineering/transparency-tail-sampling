@@ -1,3 +1,5 @@
+// Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+
 package sampling
 
 // tilt_conformity: HARDENED variant of the thesis transparency_attribute policy (see FIXES.md, H-1 .. H-7).

@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Analyse experiment v2 runs (experiments/raw/v2/<run_id>) -> tidy CSVs + JSON summary.
 
 Usage: python analyze_v2.py --raw experiments/raw/v2 --out experiments/results/v2 [--tilt tilt/tilt.corrected.json] RUN_ID...

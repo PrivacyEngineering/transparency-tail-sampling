@@ -1,3 +1,5 @@
+// Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+
 package sampling
 
 import (

@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Sample `docker stats` for the experiment collectors every INTERVAL seconds until killed.
 Usage: python3 docker_stats.py OUT.csv RUN_ID [INTERVAL]
 Writes long-format CSV: unix_time_s,run_id,container,cpu_percent,mem_mib  (cpu_percent: 100 = one core)."""

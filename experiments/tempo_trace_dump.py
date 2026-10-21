@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Print the tilt.* attributes of every span of a Tempo trace (JSON from /api/traces/<id> on stdin)."""
 import json, sys
 d = json.load(sys.stdin)
