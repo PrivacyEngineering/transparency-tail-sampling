@@ -10,11 +10,12 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
+	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 )
-
-var spec *tiltSpec //create a new tiltSpec struct
 
 const (
 	attrCheckFlag           = "tilt.check_flag"
@@ -24,7 +25,9 @@ const (
 	attrStorages            = "tilt.storage_durations"
 	attrPurposes            = "tilt.purposes"
 	attrAutomatedDecision   = "tilt.automated_decision_making"
-	tiltFileUrl             = "https://github.com/akkbng/opentelemetry-astronomy-shop/raw/main/tilt.json" //maybe add this to config
+	// DefaultTiltURL is the TILT document hard-coded in the thesis version. FIX-5: now only the default of the
+	// `transparency_attribute.tilt_url` option.
+	DefaultTiltURL          = "https://github.com/akkbng/opentelemetry-astronomy-shop/raw/main/tilt.json"
 	attrServiceName         = "service.name"                                                              //resource attribute, not trace span attribute
 )
 
@@ -68,16 +71,36 @@ type tiltSpec struct {
 type transparencyAttributeFilter struct {
 	logger   *zap.Logger
 	skipExpr expr.BoolExpr[ottlspan.TransformContext]
+	// FIX-6: the parsed TILT document is kept per policy instance (was a package-level global).
+	spec *tiltSpec
+	// EXT-1: if true, spans of TILT-declared services that carry no tilt.dataDisclosed.category
+	// attribute are skipped instead of being flagged as non-conforming (thesis behaviour: false).
+	ignoreUnannotated bool
 }
 
 var _ PolicyEvaluator = (*transparencyAttributeFilter)(nil)
 
-func NewTransparencyAttributeFilter(settings component.TelemetrySettings) PolicyEvaluator {
-	retrieveTiltFile(tiltFileUrl) //Check: Fetch the tilt file from the URL and store in tiltSpec struct
+// NewTransparencyAttributeFilter fetches the TILT document once and returns the policy evaluator.
+// FIX-5/FIX-6: the TILT location is configurable (http(s):// or file://) and fetch/decode errors are
+// returned instead of causing a nil-pointer panic.
+func NewTransparencyAttributeFilter(settings component.TelemetrySettings, tiltURL string, ignoreUnannotated bool) (PolicyEvaluator, error) {
+	if tiltURL == "" {
+		tiltURL = DefaultTiltURL
+	}
+	spec, err := retrieveTiltFile(tiltURL) //Check: Fetch the tilt file from the URL and store in tiltSpec struct
+	if err != nil {
+		return nil, err
+	}
+	settings.Logger.Info("Loaded TILT document",
+		zap.String("tilt_url", tiltURL),
+		zap.Int("data_disclosed_entries", len(spec.DataDisclosed)),
+		zap.Bool("ignore_unannotated_spans", ignoreUnannotated))
 
 	return &transparencyAttributeFilter{
-		logger: settings.Logger,
-	}
+		logger:            settings.Logger,
+		spec:              spec,
+		ignoreUnannotated: ignoreUnannotated,
+	}, nil
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
@@ -121,7 +144,7 @@ func (taf *transparencyAttributeFilter) Evaluate(ctx context.Context, _ pcommon.
 					continue
 				}
 
-				if tiltCheckSampling(currentServiceName, span) == true {
+				if tiltCheckSampling(taf.spec, taf.ignoreUnannotated, currentServiceName, span) == true {
 					return Sampled, nil
 				}
 			}
@@ -131,11 +154,14 @@ func (taf *transparencyAttributeFilter) Evaluate(ctx context.Context, _ pcommon.
 }
 
 // TODO: maybe add check flags first (at scope level), then make the sampling decision. Current implementation does not sample if the first span comes from a service that is not in the tilt file
-func tiltCheckSampling(currentServiceName pcommon.Value, span ptrace.Span) bool {
+func tiltCheckSampling(spec *tiltSpec, ignoreUnannotated bool, currentServiceName pcommon.Value, span ptrace.Span) bool {
 	for _, service := range spec.DataDisclosed {
 		if currentServiceName.AsString() == service.ServiceId {
 			//check if the attrCategories attribute of the span is listed in the services' categories. Category is a string with multiple values separated by semi-colons
 			tiltCategoryAttribute, ok := span.Attributes().Get(attrCategories)
+			if !ok && ignoreUnannotated {
+				return false // EXT-1: unannotated span of a declared service - no flag, no sampling decision
+			}
 			if !ok {
 				span.Attributes().PutBool(attrCheckFlag, false)
 				return true //if span name is in the service list, but attrCategories does not exist, check flag is false - sample
@@ -154,16 +180,33 @@ func tiltCheckSampling(currentServiceName pcommon.Value, span ptrace.Span) bool 
 	return false //if the current service name is not one of the ServiceIds in the spec struct, it doesn't contain personal data - don't sample
 }
 
-func retrieveTiltFile(url string) {
-	// Send an HTTP GET request to the URL
-	response, err := http.Get(url)
-	if err != nil {
-		fmt.Printf("Error fetching tilt file: %v", err)
+func retrieveTiltFile(url string) (*tiltSpec, error) {
+	var body io.ReadCloser
+	if strings.HasPrefix(url, "file://") {
+		f, err := os.Open(strings.TrimPrefix(url, "file://"))
+		if err != nil {
+			return nil, fmt.Errorf("error opening tilt file: %w", err)
+		}
+		body = f
+	} else {
+		// Send an HTTP GET request to the URL
+		client := &http.Client{Timeout: 30 * time.Second}
+		response, err := client.Get(url)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching tilt file: %w", err)
+		}
+		if response.StatusCode != http.StatusOK {
+			response.Body.Close()
+			return nil, fmt.Errorf("error fetching tilt file: HTTP %d from %s", response.StatusCode, url)
+		}
+		body = response.Body
 	}
+	defer body.Close()
 
-	defer response.Body.Close()
-	d := json.NewDecoder(response.Body)
-	if err := d.Decode(&spec); err != nil {
-		fmt.Printf("Error decoding tilt file: %v", err)
+	spec := &tiltSpec{}
+	d := json.NewDecoder(body)
+	if err := d.Decode(spec); err != nil {
+		return nil, fmt.Errorf("error decoding tilt file: %w", err)
 	}
+	return spec, nil
 }

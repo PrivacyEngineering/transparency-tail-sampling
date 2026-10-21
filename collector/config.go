@@ -58,6 +58,19 @@ type sharedPolicyCfg struct {
 	BooleanAttributeCfg BooleanAttributeCfg `mapstructure:"boolean_attribute"`
 	// Configs for OTTL condition filter sampling policy evaluator
 	OTTLConditionCfg OTTLConditionCfg `mapstructure:"ottl_condition"`
+	// Configs for the transparency attribute (TILT conformity) policy evaluator. FIX-5 / EXT-1.
+	TransparencyAttributeCfg TransparencyAttributeCfg `mapstructure:"transparency_attribute"`
+}
+
+// TransparencyAttributeCfg holds the configurable settings of the transparency_attribute policy.
+// Not present in the thesis version, where the TILT URL was a hard-coded constant.
+type TransparencyAttributeCfg struct {
+	// TiltURL is the location of the TILT document (http://, https:// or file://).
+	// Defaults to the URL hard-coded in the thesis version.
+	TiltURL string `mapstructure:"tilt_url"`
+	// IgnoreUnannotatedSpans (EXT-1, default false = thesis behaviour): when true, spans of TILT-declared
+	// services without a tilt.dataDisclosed.category attribute are not treated as non-conforming.
+	IgnoreUnannotatedSpans bool `mapstructure:"ignore_unannotated_spans"`
 }
 
 // CompositeSubPolicyCfg holds the common configuration to all policies under composite policy.
