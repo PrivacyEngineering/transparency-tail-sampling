@@ -50,7 +50,40 @@ for r in 1 2 3 4 5; do TAILPROB_PCT=31 experiments/run_experiment.sh run$r 300 1
 .venv/bin/python experiments/analyze.py --raw experiments/raw --out experiments/results/v1 run1 run2 run3 run4 run5
 ```
 
-<!-- V1 RESULTS -->
+**Results v1** (mean ± sd over runs; `results/v1/metrics_long.csv`, `summary.json`, per-trace ground truth in
+`results/v1/traces/`, resources in `docker_stats_long.csv`):
+
+n = 5 runs × 300 s; per run (mean ± sd) 15281 ± 257 traces, 74531 ± 2119 spans (≈248 spans/s), 2499 PD traces, 2499 thesis-semantics violations, 54.4 ± 8.9 drift traces.
+
+| config | trace retention | span retention | recall PD traces | recall thesis-semantics violations | recall injected drift | share of kept traces with drift | CPU (mcores) | mem (MiB) |
+|---|---|---|---|---|---|---|---|---|
+| `none` | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 0.004 ± 0.001 | 5.2 ± 0.9 | 43.9 ± 6.6 |
+| `head1` | 0.010 ± 0.001 | 0.011 ± 0.001 | 0.011 ± 0.001 | 0.011 ± 0.001 | 0.012 ± 0.017 | 0.004 ± 0.006 | 4.2 ± 1.0 | 42.5 ± 0.6 |
+| `head10` | 0.100 ± 0.002 | 0.102 ± 0.005 | 0.101 ± 0.005 | 0.101 ± 0.005 | 0.124 ± 0.028 | 0.004 ± 0.001 | 4.5 ± 1.1 | 43.2 ± 1.5 |
+| `tailprob` | 0.311 ± 0.003 | 0.311 ± 0.008 | 0.311 ± 0.011 | 0.311 ± 0.011 | 0.320 ± 0.094 | 0.004 ± 0.001 | 5.0 ± 1.2 | 62.6 ± 0.7 |
+| `tailpd` | 0.163 ± 0.004 | 0.442 ± 0.011 | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 0.022 ± 0.003 | 6.0 ± 1.4 | 62.4 ± 1.2 |
+| `tailthesis` | 0.163 ± 0.004 | 0.442 ± 0.011 | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 0.022 ± 0.003 | 6.5 ± 1.8 | 63.2 ± 1.8 |
+| `transpthesis` | 0.163 ± 0.003 | 0.441 ± 0.011 | 0.999 ± 0.001 | 0.999 ± 0.001 | 1.000 ± 0.000 | 0.022 ± 0.003 | 6.1 ± 1.3 | 62.8 ± 0.7 |
+| `transp` | 0.163 ± 0.004 | 0.442 ± 0.011 | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 0.022 ± 0.003 | 6.0 ± 1.4 | 62.5 ± 0.9 |
+| `transpstrict` | 0.004 ± 0.001 | 0.031 ± 0.005 | 0.022 ± 0.003 | 0.022 ± 0.003 | 1.000 ± 0.000 | 1.000 ± 0.000 | 4.9 ± 1.3 | 61.3 ± 1.4 |
+
+Observations:
+* With the corrected TILT, **every** personal-data trace is a violation under the thesis semantics
+  (2 499 = 2 499 per run). Each one contains an unannotated span of a TILT-listed service (gRPC client spans,
+  Redis, ...). So `transp` behaves exactly like the PD-presence policy `tailpd` (identical retained sets). Only the
+  injected drift (54/run) is a real declaration mismatch.
+* `transpthesis` (Listing 5.4) loses 0.1 % of the violating traces (rate limit, no fall-through) even at ~250 spans/s.
+  `tailthesis` = `tailpd`, i.e. `always_sample` contributes nothing (0 budget).
+* `head1`/`head10`/`tailprob` keep violations only in proportion to their sampling rate. Drift recall is
+  0.012 ± 0.017, 0.124 ± 0.028 and 0.320 ± 0.094.
+* `transpstrict` (ADD-2) keeps 0.4 % of traces (3.1 % of spans), and all of them are drift (precision 1.0, recall 1.0).
+* `tailprob` was configured at 31 %, the retention of `transp` in a 2-min pilot right after collector start
+  (dominated by Node `fs` start-up traces). In steady state `transp` keeps 16.3 %, so `tailprob` keeps ~2× more
+  traces than intended and still has 0.31 recall. v2 uses 16 %.
+* CPU (≈5 mcores) and memory (≈43 MiB without, ≈62 MiB with a 30 s tail buffer) are tiny at this load. Differences
+  between configs are within noise. The decision-latency metric of v1 is the µs-truncated original
+  (`policy_decision_latency_mean` in µs); v2 and the benchmark use the ns histogram.
+
 
 ---------------------------------------------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ services:
     image: otel-transparency-collector:dev
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes: ["./configs/${BENCH_CONFIG:-B0-none}.yaml:/etc/otelcol/config.yaml:ro"]
-    ports: ["18888:8888"]
+    ports: ["19888:8888"]
     cpus: 2
     mem_limit: 2g
     memswap_limit: 2g
