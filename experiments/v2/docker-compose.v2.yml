@@ -1,0 +1,128 @@
+# Experiment v2 overlay (use with ../../deploy/docker-compose.yml; driven by run_v2.sh). Services send to "fanout".
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "5m", max-file: "2" }
+services:
+  fanout:
+    image: ${CONTRIB_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { DRIFT_V1: "${DRIFT_V1:-^0}", DRIFT_V2: "${DRIFT_V2:-^1}", DRIFT_V3: "${DRIFT_V3:-^2}" }
+    volumes: ["../experiments/v2/configs/fanout.yaml:/etc/otelcol/config.yaml:ro"]
+    ports: ["18880:8888"]
+    logging: *logging
+  sink:
+    image: ${CONTRIB_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    user: "0"
+    volumes: ["../experiments/v2/configs/sink.yaml:/etc/otelcol/config.yaml:ro", "${SINK_DIR:-../experiments/raw/v2/sink}:/data"]
+    logging: *logging
+  c2-none:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-none.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18881:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-head1:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-head1.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18882:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-head10:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-head10.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18883:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-tailprob:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-tailprob.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18884:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-tailthesis:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-tailthesis.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18885:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-transpthesis:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-transpthesis.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18886:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-transp:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-transp.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18887:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-hardened:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-hardened.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18888:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging
+  c2-hardenedcomp:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [exp2]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-30}", TILT_SHA256: "${TILT_SHA256:-b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a}" }
+    volumes:
+      - "../experiments/v2/configs/sampler-hardenedcomp.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18889:8888"]
+    mem_limit: 300m
+    depends_on: [sink]
+    logging: *logging

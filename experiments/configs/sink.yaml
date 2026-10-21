@@ -1,0 +1,95 @@
+# Sink collector (otelcol-contrib, not measured): writes every sampler's output to its own zstd-compressed OTLP-JSON file.
+receivers:
+  otlp/none:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4401 }
+  otlp/head1:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4402 }
+  otlp/head10:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4403 }
+  otlp/tailprob:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4404 }
+  otlp/tailpd:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4405 }
+  otlp/tailthesis:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4406 }
+  otlp/transpthesis:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4407 }
+  otlp/transp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4408 }
+  otlp/transpstrict:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4409 }
+exporters:
+  file/none:
+    path: /data/none.jsonl.zst
+    format: json
+    compression: zstd
+  file/head1:
+    path: /data/head1.jsonl.zst
+    format: json
+    compression: zstd
+  file/head10:
+    path: /data/head10.jsonl.zst
+    format: json
+    compression: zstd
+  file/tailprob:
+    path: /data/tailprob.jsonl.zst
+    format: json
+    compression: zstd
+  file/tailpd:
+    path: /data/tailpd.jsonl.zst
+    format: json
+    compression: zstd
+  file/tailthesis:
+    path: /data/tailthesis.jsonl.zst
+    format: json
+    compression: zstd
+  file/transpthesis:
+    path: /data/transpthesis.jsonl.zst
+    format: json
+    compression: zstd
+  file/transp:
+    path: /data/transp.jsonl.zst
+    format: json
+    compression: zstd
+  file/transpstrict:
+    path: /data/transpstrict.jsonl.zst
+    format: json
+    compression: zstd
+service:
+  pipelines:
+    traces/none:
+      receivers: [otlp/none]
+      exporters: [file/none]
+    traces/head1:
+      receivers: [otlp/head1]
+      exporters: [file/head1]
+    traces/head10:
+      receivers: [otlp/head10]
+      exporters: [file/head10]
+    traces/tailprob:
+      receivers: [otlp/tailprob]
+      exporters: [file/tailprob]
+    traces/tailpd:
+      receivers: [otlp/tailpd]
+      exporters: [file/tailpd]
+    traces/tailthesis:
+      receivers: [otlp/tailthesis]
+      exporters: [file/tailthesis]
+    traces/transpthesis:
+      receivers: [otlp/transpthesis]
+      exporters: [file/transpthesis]
+    traces/transp:
+      receivers: [otlp/transp]
+      exporters: [file/transp]
+    traces/transpstrict:
+      receivers: [otlp/transpstrict]
+      exporters: [file/transpstrict]

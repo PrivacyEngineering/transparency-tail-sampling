@@ -1,0 +1,25 @@
+# Experiment v2 sampler "head1". Head-based-equivalent 1 % (trace-ID hash).
+# Pipeline as in the thesis deployment: memory_limiter -> sampler -> batch (container limit 300 MiB as in the Helm values).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 240
+    spike_limit_mib: 60
+  batch:
+  probabilistic_sampler: { sampling_percentage: 1, hash_seed: 22 }
+exporters:
+  otlp:
+    endpoint: sink:4402
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, probabilistic_sampler, batch]
+      exporters: [otlp]

@@ -1,0 +1,31 @@
+# Sampler collector "tailpd" (otel-transparency-collector image, identical binary for all configurations).
+# Contrib tail sampling, OTTL policy: keep every trace with a span carrying tilt.dataDisclosed.category (no rate limit, no conformity check).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch:
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      - name: personal-data-category-policy
+        type: ottl_condition
+        ottl_condition:
+          error_mode: ignore
+          span: ['attributes["tilt.dataDisclosed.category"] != nil']
+
+exporters:
+  otlp:
+    endpoint: sink:4405
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling, batch]
+      exporters: [otlp]

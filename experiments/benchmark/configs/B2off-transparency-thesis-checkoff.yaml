@@ -1,0 +1,38 @@
+# B2-off: CHECK OFF (transparency_attribute.disabled: true, always NotSampled) - otherwise identical to B2.
+# B2: transparency processor with the thesis transparency composite configuration (thesis Listing 5.4); TILT served over HTTP.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 64 }
+processors:
+  batch:
+  transparency:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      [
+        {
+          name: example-composite-policy, type: composite,
+          composite: {
+            max_total_spans_per_second: 1000,
+            policy_order: [tilt-check-policy, personal-data-category-policy, always-sample-policy],
+            composite_sub_policy: [
+              { name: tilt-check-policy, type: transparency_attribute,
+                transparency_attribute: { tilt_url: "http://tilt-server/tilt.json", disabled: true } },
+              { name: personal-data-category-policy, type: ottl_condition,
+                ottl_condition: { error_mode: ignore, span: [ "attributes[\"tilt.dataDisclosed.category\"] != nil" ] } },
+              { name: always-sample-policy, type: always_sample } ],
+            rate_allocation: [ { policy: tilt-check-policy, percent: 50 }, { policy: personal-data-category-policy, percent: 25 } ] } },
+      ]
+exporters:
+  otlp:
+    endpoint: sink:4317
+    tls: { insecure: true }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transparency, batch]
+      exporters: [otlp]

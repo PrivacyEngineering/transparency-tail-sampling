@@ -1,0 +1,29 @@
+# Sampler collector "transpstrict" (otel-transparency-collector image, identical binary for all configurations).
+# Transparency processor, transparency_attribute policy with the opt-in EXT-1 (ignore_unannotated_spans: true): only declared-category mismatches count.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch:
+  transparency:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      - name: tilt-check-policy
+        type: transparency_attribute
+        transparency_attribute: { tilt_url: "file:///etc/tilt/tilt.json", ignore_unannotated_spans: true }
+
+exporters:
+  otlp:
+    endpoint: sink:4409
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transparency, batch]
+      exporters: [otlp]

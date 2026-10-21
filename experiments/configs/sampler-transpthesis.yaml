@@ -1,0 +1,47 @@
+# Sampler collector "transpthesis" (otel-transparency-collector image, identical binary for all configurations).
+# Transparency processor with the suggested composite configuration of the thesis (Listing 5.4).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch:
+  transparency:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      [
+        {
+          name: example-composite-policy,
+          type: composite,
+          composite:
+            {
+              max_total_spans_per_second: 1000,
+              policy_order: [tilt-check-policy, personal-data-category-policy, always-sample-policy],
+              composite_sub_policy:
+                [
+                  { name: tilt-check-policy, type: transparency_attribute,
+                    transparency_attribute: { tilt_url: "file:///etc/tilt/tilt.json" } },
+                  { name: personal-data-category-policy, type: ottl_condition,
+                    ottl_condition: { error_mode: ignore, span: [ "attributes[\"tilt.dataDisclosed.category\"] != nil" ] } },
+                  { name: always-sample-policy, type: always_sample },
+                ],
+              rate_allocation:
+                [ { policy: tilt-check-policy, percent: 50 }, { policy: personal-data-category-policy, percent: 25 } ],
+            },
+        },
+      ]
+
+exporters:
+  otlp:
+    endpoint: sink:4407
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transparency, batch]
+      exporters: [otlp]

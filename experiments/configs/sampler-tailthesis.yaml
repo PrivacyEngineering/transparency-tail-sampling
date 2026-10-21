@@ -1,0 +1,44 @@
+# Sampler collector "tailthesis" (otel-transparency-collector image, identical binary for all configurations).
+# Contrib tail sampling with the thesis baseline configuration (thesis Listing 6.1).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch:
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      [
+        {
+          name: base-composite-policy,
+          type: composite,
+          composite:
+            {
+              max_total_spans_per_second: 1000,
+              policy_order: [personal-data-category-policy, always-sample-policy],
+              composite_sub_policy:
+                [
+                  { name: personal-data-category-policy, type: ottl_condition,
+                    ottl_condition: { error_mode: ignore, span: [ "attributes[\"tilt.dataDisclosed.category\"] != nil" ] } },
+                  { name: always-sample-policy, type: always_sample },
+                ],
+              rate_allocation: [ { policy: personal-data-category-policy, percent: 75 } ],
+            },
+        },
+      ]
+
+exporters:
+  otlp:
+    endpoint: sink:4406
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling, batch]
+      exporters: [otlp]

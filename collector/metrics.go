@@ -30,6 +30,13 @@ var (
 	statDroppedTooEarlyCount    = stats.Int64("sampling_trace_dropped_too_early", "Count of traces that needed to be dropped the configured wait time", stats.UnitDimensionless)
 	statNewTraceIDReceivedCount = stats.Int64("new_trace_id_received", "Counts the arrival of new traces", stats.UnitDimensionless)
 	statTracesOnMemoryGauge     = stats.Int64("sampling_traces_on_memory", "Tracks the number of traces current on memory", stats.UnitDimensionless)
+
+	// Added for the reproducibility artifact (names prefixed "tp_" so they are not shared with the
+	// identically named OpenCensus measures of the contrib tail_sampling processor in the same binary).
+	statDecisionLatencyNs  = stats.Int64("tp_sampling_decision_latency_ns", "Latency (ns) of one policy evaluation for one trace", "ns")
+	statLateSpansForwarded = stats.Int64("tp_late_spans_forwarded", "Spans arriving after the decision that were forwarded", stats.UnitDimensionless)
+	statLateSpansDropped   = stats.Int64("tp_late_spans_dropped", "Spans arriving after a NotSampled decision that were dropped", stats.UnitDimensionless)
+	statEvictedUndecided   = stats.Int64("tp_traces_evicted_undecided", "Traces evicted (num_traces exceeded) before a decision", stats.UnitDimensionless)
 )
 
 // SamplingProcessorMetricViews return the metrics views according to given telemetry level.
@@ -105,7 +112,19 @@ func SamplingProcessorMetricViews(level configtelemetry.Level) []*view.View {
 		Aggregation: view.LastValue(),
 	}
 
-	return []*view.View{
+	nsDist := view.Distribution(100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1e6, 2.5e6, 1e7, 1e8)
+	extra := []*view.View{
+		{Name: obsreport.BuildProcessorCustomMetricName(Type, statDecisionLatencyNs.Name()), Measure: statDecisionLatencyNs,
+			Description: statDecisionLatencyNs.Description(), TagKeys: policyTagKeys, Aggregation: nsDist},
+		{Name: obsreport.BuildProcessorCustomMetricName(Type, statLateSpansForwarded.Name()), Measure: statLateSpansForwarded,
+			Description: statLateSpansForwarded.Description(), Aggregation: view.Sum()},
+		{Name: obsreport.BuildProcessorCustomMetricName(Type, statLateSpansDropped.Name()), Measure: statLateSpansDropped,
+			Description: statLateSpansDropped.Description(), Aggregation: view.Sum()},
+		{Name: obsreport.BuildProcessorCustomMetricName(Type, statEvictedUndecided.Name()), Measure: statEvictedUndecided,
+			Description: statEvictedUndecided.Description(), Aggregation: view.Sum()},
+	}
+
+	return append(extra,
 		decisionLatencyView,
 		overallDecisionLatencyView,
 
@@ -119,5 +138,5 @@ func SamplingProcessorMetricViews(level configtelemetry.Level) []*view.View {
 		countTraceDroppedTooEarlyView,
 		countTraceIDArrivalView,
 		trackTracesOnMemorylView,
-	}
+	)
 }

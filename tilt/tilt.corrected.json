@@ -1,0 +1,286 @@
+{
+  "dataDisclosed": [
+    {
+      "_id": "paymentservice",
+      "category": "Credit Card; transaction id",
+      "purposes": [
+        {
+          "purpose": "Processing is necessary for the performance of a contract to which the data subject is party or in order to take steps at the request of the data subject prior to entering into a contract.",
+          "description": ""
+        },
+        {
+          "purpose": "transaction id for the order placement",
+          "description": ""
+        }
+      ],
+      "legalBases": [
+        {
+          "reference": "GDPR-6(1)(b)",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        }
+      ],
+      "legitimateInterests": [
+        {
+          "exists": true,
+          "reasoning": ""
+        }
+      ],
+      "recipients": [
+        {
+          "name": "IAM",
+          "category": "iam connection"
+        },
+        {
+          "name": "tag commander",
+          "category": "tag management"
+        }
+      ],
+      "storage": [
+        {
+          "temporal": [
+            {
+              "description": "The data of personal nature collected using cookies will not be retained for longer than is necessary to fulfi l the designated purpose of the cookies concerned, and in any event nolonger than thirteen months.",
+              "ttl": "P13M"
+            }
+          ],
+          "purposeConditional": [
+            "session cookies which disappear when you leave the Website",
+            "permanent cookies which remain on your terminal equipment until they expire or until you delete them using your browser’s functionalities.",
+            "The data of personal nature collected using cookies will not be retained for longer than is necessary to fulfi l the designated purpose of the cookies concerned, and in any event nolonger than thirteen months."
+          ],
+          "legalBasisConditional": [],
+          "aggregationFunction": "max"
+        }
+      ],
+      "nonDisclosure": {
+        "legalRequirement": false,
+        "contractualRegulation": false,
+        "obligationToProvide": true,
+        "consequences": "if you set your browser to reject cookies certain functionalities, pages and spaces on the Website requiring the use of cookies, will not be available"
+      }
+    },
+    {
+      "_id": "shippingservice",
+      "category": "user address; tracking id",
+      "purposes": [
+        {
+          "purpose": "To ship the order to the customer",
+          "description": ""
+        },
+        {
+          "purpose": "To track the order",
+          "description": ""
+        }
+      ],
+      "legalBases": [
+        {
+          "reference": "GDPR-99-1-a",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        }
+      ],
+      "legitimateInterests": [
+        {
+          "exists": true,
+          "reasoning": ""
+        }
+      ],
+      "recipients": [],
+      "storage": [
+        {
+          "temporal": [
+            {
+              "description": "The data of personal nature collected using cookies will not be retained for longer than is necessary to fulfi l the designated purpose of the cookies concerned, and in any event nolonger than thirteen months.",
+              "ttl": "P13M"
+            }
+          ],
+          "purposeConditional": [],
+          "legalBasisConditional": [],
+          "aggregationFunction": "max"
+        }
+      ],
+      "nonDisclosure": {
+        "legalRequirement": false,
+        "contractualRegulation": false,
+        "obligationToProvide": true,
+        "consequences": "if you set your browser to reject cookies certain functionalities, pages and spaces on the Website requiring the use of cookies, will not be available"
+      }
+    },
+    {
+      "_id": "checkoutservice",
+      "category": "user id; order id; transaction id; tracking id; customer email",
+      "purposes": [
+        {
+          "purpose": "user identification for order placement",
+          "description": ""
+        },
+        {
+          "purpose": "order identification for fulling the order",
+          "description": ""
+        },
+        {
+          "purpose": "transaction id for order placement",
+          "description": ""
+        },
+        {
+          "purpose": "tracking id for order placement",
+          "description": ""
+        },
+        {
+          "purpose": "To send order confirmation email",
+          "description": ""
+        }
+      ],
+      "legalBases": [
+        {
+          "reference": "GDPR-99-1-a",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        },
+        {
+          "reference": "GDPR-6-1-a",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        },
+        {
+          "reference": "GDPR-8-1-a",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        }
+      ],
+      "legitimateInterests": [
+        {
+          "exists": true,
+          "reasoning": ""
+        }
+      ],
+      "recipients": [],
+      "storage": [
+        {
+          "temporal": [
+            {
+              "description": "The data of personal nature collected using cookies will not be retained for longer than is necessary to fulfi l the designated purpose of the cookies concerned, and in any event nolonger than thirteen months.",
+              "ttl": "P13M"
+            }
+          ],
+          "purposeConditional": [],
+          "legalBasisConditional": [],
+          "aggregationFunction": "max"
+        }
+      ],
+      "nonDisclosure": {
+        "legalRequirement": false,
+        "contractualRegulation": false,
+        "obligationToProvide": true,
+        "consequences": "if you set your browser to reject cookies certain functionalities, pages and spaces on the Website requiring the use of cookies, will not be available"
+      }
+    },
+    {
+      "_id": "emailservice",
+      "purposes": [
+        {
+          "purpose": "Communication management",
+          "description": "Management and tracking of requests for stock subscriptions and/or subscriptions topublications and various communications, in addition to news flows;"
+        },
+        {
+          "purpose": "Request management",
+          "description": "Management and tracking of requests for information and complaints, where applicable"
+        }
+      ],
+      "legalBases": [
+        {
+          "reference": "GDPR",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        }
+      ],
+      "legitimateInterests": [
+        {
+          "exists": true,
+          "reasoning": "Processing operations that are based on the pursuit of OpenTelemetry Astronomy Shop's legitimate interests are implemented ensuring respect of your rights and freedoms."
+        }
+      ],
+      "recipients": [
+        {
+          "category": "Accredited individuals"
+        },
+        {
+          "category": "Service providers and subcontractors"
+        },
+        {
+          "category": "Official and judicial authorities"
+        }
+      ],
+      "storage": [
+        {
+          "temporal": [],
+          "purposeConditional": [
+            ""
+          ],
+          "legalBasisConditional": [],
+          "aggregationFunction": "max"
+        }
+      ],
+      "nonDisclosure": {
+        "legalRequirement": false,
+        "contractualRegulation": false,
+        "obligationToProvide": true,
+        "consequences": "OpenTelemetry Astronomy Show collects data via the website's checkout form"
+      },
+      "category": "customer email"
+    },
+    {
+      "_id": "cartservice",
+      "category": "user id",
+      "purposes": [
+        {
+          "purpose": "To track the user's cart",
+          "description": "Such identifiers can leave traces which may, especially if they are combined with unique login details and other information received by servers, be used to build profiles of the individuals concerned and to identify them."
+        },
+        {
+          "purpose": "To fetch the user's cart",
+          "description": "Such identifiers can leave traces which may, especially if they are combined with unique login details and other information received by servers, be used to build profiles of the individuals concerned and to identify them."
+        },
+        {
+          "purpose": "To empty the user's cart",
+          "description": "Such identifiers can leave traces which may, especially if they are combined with unique login details and other information received by servers, be used to build profiles of the individuals concerned and to identify them."
+        }
+      ],
+      "legalBases": [
+        {
+          "reference": "GDPR-99-1-a",
+          "description": "REGULATION (EU) 2016/679 OF THE EUROPEAN PARLIAMENT AND OF THE COUNCIL of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data"
+        }
+      ],
+      "legitimateInterests": [
+        {
+          "exists": true,
+          "reasoning": "Processing operations that are based on the pursuit of OpenTelemetry Astronomy Shop’s legitimate interests are implemented ensuring respect of your rights and freedoms."
+        }
+      ],
+      "recipients": [
+        {
+          "name": "google analytics",
+          "category": "Tracking"
+        }
+      ],
+      "storage": [
+        {
+          "temporal": [
+            {
+              "description": "The data of personal nature collected using cookies will not be retained for longer than is necessary to fulfi l the designated purpose of the cookies concerned, and in any event nolonger than thirteen months.",
+              "ttl": "P13M"
+            }
+          ],
+          "purposeConditional": [],
+          "legalBasisConditional": [],
+          "aggregationFunction": "max"
+        }
+      ],
+      "nonDisclosure": {
+        "legalRequirement": false,
+        "contractualRegulation": false,
+        "obligationToProvide": false,
+        "consequences": "if you set your browser to reject cookies certain functionalities, pages and spaces on the Website requiring the use of cookies, will not be available"
+      }
+    }
+  ],
+  "automatedDecisionMaking": {
+    "inUse": false
+  }
+}

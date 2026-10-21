@@ -1,0 +1,33 @@
+# Experiment v2 sampler "tailprob". Contrib tail sampling, probabilistic policy, budget matched to the thesis transparency_attribute policy (TAILPROB_PCT).
+# Pipeline as in the thesis deployment: memory_limiter -> sampler -> batch (container limit 300 MiB as in the Helm values).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 240
+    spike_limit_mib: 60
+  batch:
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      - name: probabilistic-matched
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:TAILPROB_PCT}
+exporters:
+  otlp:
+    endpoint: sink:4404
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, batch]
+      exporters: [otlp]

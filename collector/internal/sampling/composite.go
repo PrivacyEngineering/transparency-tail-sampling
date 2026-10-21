@@ -19,6 +19,21 @@ type subpolicy struct {
 
 	// spans per second that each subpolicy sampled in this period
 	sampledSPS int64
+
+	// H-7d: traces this subpolicy votes for bypass the rate limit ("unbudgeted evidence")
+	unbudgeted bool
+}
+
+// CompositeOptions are hardening switches (all false = upstream/thesis behaviour). See FIXES.md H-7.
+type CompositeOptions struct {
+	// FallThrough: a sub-policy that votes Sampled but is over budget does not end the evaluation;
+	// the next sub-policy is evaluated (H-7a).
+	FallThrough bool
+	// EnforceTotalBudget: the sum of spans sampled by all sub-policies in a second is capped by
+	// max_total_spans_per_second (H-7c).
+	EnforceTotalBudget bool
+	// Unbudgeted marks sub-policies (by index) whose Sampled votes bypass the rate limit (H-7d).
+	Unbudgeted map[int]bool
 }
 
 // Composite evaluator and its internal data
@@ -36,6 +51,9 @@ type Composite struct {
 	timeProvider TimeProvider
 
 	logger *zap.Logger
+
+	opts     CompositeOptions
+	totalSPS int64
 }
 
 var _ PolicyEvaluator = (*Composite)(nil)
@@ -75,6 +93,26 @@ func NewComposite(
 	}
 }
 
+// NewCompositeWithOptions creates a composite evaluator with hardening options (see CompositeOptions).
+func NewCompositeWithOptions(logger *zap.Logger, maxTotalSpansPerSecond int64, subPolicyParams []SubPolicyEvalParams,
+	timeProvider TimeProvider, opts CompositeOptions) PolicyEvaluator {
+	c := NewComposite(logger, maxTotalSpansPerSecond, subPolicyParams, timeProvider).(*Composite)
+	c.opts = opts
+	for i, sub := range c.subpolicies {
+		sub.unbudgeted = opts.Unbudgeted[i]
+	}
+	return c
+}
+
+// Children returns the sub-policy evaluators (used to find LateSpanCheckers).
+func (c *Composite) Children() []PolicyEvaluator {
+	out := make([]PolicyEvaluator, 0, len(c.subpolicies))
+	for _, s := range c.subpolicies {
+		out = append(out, s.evaluator)
+	}
+	return out
+}
+
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
 func (c *Composite) Evaluate(ctx context.Context, traceID pcommon.TraceID, trace *TraceData) (Decision, error) {
 	// Rate limiting works by counting spans that are sampled during each 1 second
@@ -92,6 +130,7 @@ func (c *Composite) Evaluate(ctx context.Context, traceID pcommon.TraceID, trace
 		for i := range c.subpolicies {
 			c.subpolicies[i].sampledSPS = 0
 		}
+		c.totalSPS = 0
 	}
 
 	for _, sub := range c.subpolicies {
@@ -102,16 +141,30 @@ func (c *Composite) Evaluate(ctx context.Context, traceID pcommon.TraceID, trace
 
 		if decision == Sampled || decision == InvertSampled {
 			// The subpolicy made a decision to Sample. Now we need to make our decision.
+			n := trace.SpanCount.Load()
+
+			// H-7d: unbudgeted evidence is always kept (but still counted)
+			if sub.unbudgeted {
+				sub.sampledSPS += n
+				c.totalSPS += n
+				return Sampled, nil
+			}
 
 			// Calculate resulting SPS counter if we decide to sample this trace
-			spansInSecondIfSampled := sub.sampledSPS + trace.SpanCount.Load()
+			spansInSecondIfSampled := sub.sampledSPS + n
+			withinTotal := !c.opts.EnforceTotalBudget || c.totalSPS+n <= c.maxTotalSPS
 
 			// Check if the rate will be within the allocated bandwidth.
-			if spansInSecondIfSampled <= sub.allocatedSPS && spansInSecondIfSampled <= c.maxTotalSPS {
+			if spansInSecondIfSampled <= sub.allocatedSPS && spansInSecondIfSampled <= c.maxTotalSPS && withinTotal {
 				sub.sampledSPS = spansInSecondIfSampled
+				c.totalSPS += n
 
 				// Let the sampling happen
 				return Sampled, nil
+			}
+
+			if c.opts.FallThrough {
+				continue // H-7a: give the next sub-policy a chance
 			}
 
 			// We exceeded the rate limit. Don't sample this trace.

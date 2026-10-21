@@ -1,0 +1,30 @@
+# Sampler collector "tailprob" (otel-transparency-collector image, identical binary for all configurations).
+# Contrib tail sampling, probabilistic policy at a retention budget matched to the transparency_attribute policy (TAILPROB_PCT).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch:
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      - name: probabilistic-matched
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:TAILPROB_PCT}
+
+exporters:
+  otlp:
+    endpoint: sink:4404
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling, batch]
+      exporters: [otlp]

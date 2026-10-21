@@ -1,0 +1,35 @@
+# B3-off: CHECK OFF (tilt_conformity.disabled: true) - otherwise identical to B3.
+# B3: HARDENED composite (tilt_conformity: exact match, V3, sha256-pinned TILT over HTTP; V1/V3 evidence unbudgeted;
+# V2 25 %, PD presence 25 %, always_sample remaining 50 %; fall-through; global budget; late-span check; decide on eviction).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 64 }
+processors:
+  batch:
+  transparency:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    late_span_check: true
+    decide_on_eviction: true
+    policies:
+      [ { name: hardened-composite, type: composite, composite: {
+            max_total_spans_per_second: 1000, fall_through: true, unallocated_share_remaining: true, enforce_total_budget: true,
+            unbudgeted_policies: [tilt-evidence],
+            composite_sub_policy: [ { name: tilt-evidence, type: tilt_conformity, tilt_conformity: { tilt_url: "http://tilt-server/tilt.json", tilt_sha256: "b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a", disabled: true } },
+                                    { name: tilt-missing-annotation, type: tilt_conformity, tilt_conformity: { tilt_url: "http://tilt-server/tilt.json", tilt_sha256: "b41c071628d117f5165313dc923efe35c7242b834dc174669edd33480e43f69a", sample_on: [missing_annotation], disabled: true } },
+                                    { name: personal-data-category-policy, type: ottl_condition, ottl_condition: { error_mode: ignore, span: [ "attributes[\"tilt.dataDisclosed.category\"] != nil" ] } },
+                                    { name: always-sample-policy, type: always_sample } ],
+            rate_allocation: [ { policy: tilt-missing-annotation, percent: 25 }, { policy: personal-data-category-policy, percent: 25 } ] } } ]
+exporters:
+  otlp:
+    endpoint: sink:4317
+    tls: { insecure: true }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transparency, batch]
+      exporters: [otlp]

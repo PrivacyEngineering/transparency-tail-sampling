@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+  scrape_timeout: 3s
+scrape_configs:
+  - job_name: otelcol
+    honor_labels: true
+    static_configs:
+      - targets: ["otelcol:9464", "otelcol:8888"]

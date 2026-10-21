@@ -49,3 +49,6 @@ func (c *And) Evaluate(ctx context.Context, traceID pcommon.TraceID, trace *Trac
 func (c *And) OnDroppedSpans(pcommon.TraceID, *TraceData) (Decision, error) {
 	return Sampled, nil
 }
+
+// Children returns the sub-policy evaluators (used to find LateSpanCheckers).
+func (c *And) Children() []PolicyEvaluator { return c.subpolicies }

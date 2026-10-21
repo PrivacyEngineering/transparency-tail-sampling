@@ -35,6 +35,8 @@ const (
 
 	// TransparencyAttribute sample traces based on their tilt checks and service dependency paths
 	TransparencyAttribute PolicyType = "transparency_attribute"
+	// TiltConformity is the hardened TILT conformity policy (not in the thesis; see FIXES.md H-1..H-6).
+	TiltConformity PolicyType = "tilt_conformity"
 )
 
 // sharedPolicyCfg holds the common configuration to all policies that are used in derivative policy configurations
@@ -60,6 +62,23 @@ type sharedPolicyCfg struct {
 	OTTLConditionCfg OTTLConditionCfg `mapstructure:"ottl_condition"`
 	// Configs for the transparency attribute (TILT conformity) policy evaluator. FIX-5 / EXT-1.
 	TransparencyAttributeCfg TransparencyAttributeCfg `mapstructure:"transparency_attribute"`
+	// Configs for the hardened tilt_conformity policy.
+	TiltConformityCfg TiltConformityCfg `mapstructure:"tilt_conformity"`
+}
+
+// TiltConformityCfg configures the hardened tilt_conformity policy.
+type TiltConformityCfg struct {
+	// TiltURL: http://, https:// or file:// location of the TILT document (pin a version, e.g. a commit URL).
+	TiltURL string `mapstructure:"tilt_url"`
+	// TiltSHA256: optional hex sha256 of the document; on mismatch the document is rejected (fail closed).
+	TiltSHA256 string `mapstructure:"tilt_sha256"`
+	// SampleOn: reasons that make a trace sampled. Default [undeclared_category, unlisted_service, tilt_unavailable];
+	// add missing_annotation to reproduce the thesis semantics for unannotated spans.
+	SampleOn []string `mapstructure:"sample_on"`
+	// RefreshInterval: how often the TILT document is re-fetched / retried (default 60s).
+	RefreshInterval time.Duration `mapstructure:"refresh_interval"`
+	// Disabled: check-off switch for overhead measurements.
+	Disabled bool `mapstructure:"disabled"`
 }
 
 // TransparencyAttributeCfg holds the configurable settings of the transparency_attribute policy.
@@ -71,6 +90,8 @@ type TransparencyAttributeCfg struct {
 	// IgnoreUnannotatedSpans (EXT-1, default false = thesis behaviour): when true, spans of TILT-declared
 	// services without a tilt.dataDisclosed.category attribute are not treated as non-conforming.
 	IgnoreUnannotatedSpans bool `mapstructure:"ignore_unannotated_spans"`
+	// Disabled: check-off switch for overhead measurements (policy always returns NotSampled).
+	Disabled bool `mapstructure:"disabled"`
 }
 
 // CompositeSubPolicyCfg holds the common configuration to all policies under composite policy.
@@ -104,6 +125,11 @@ type CompositeCfg struct {
 	PolicyOrder            []string                `mapstructure:"policy_order"`
 	SubPolicyCfg           []CompositeSubPolicyCfg `mapstructure:"composite_sub_policy"`
 	RateAllocation         []RateAllocationCfg     `mapstructure:"rate_allocation"`
+	// Hardening switches (default false = thesis/upstream behaviour), see FIXES.md H-7.
+	FallThrough               bool     `mapstructure:"fall_through"`
+	UnallocatedShareRemaining bool     `mapstructure:"unallocated_share_remaining"`
+	EnforceTotalBudget        bool     `mapstructure:"enforce_total_budget"`
+	UnbudgetedPolicies        []string `mapstructure:"unbudgeted_policies"`
 }
 
 // RateAllocationCfg  used within composite policy
@@ -210,4 +236,10 @@ type Config struct {
 	// PolicyCfgs sets the tail-based sampling policy which makes a sampling decision
 	// for a given trace when requested.
 	PolicyCfgs []PolicyCfg `mapstructure:"policies"`
+	// LateSpanCheck (H-6): spans arriving after the decision are checked by tilt_conformity policies; violating
+	// late spans of not-sampled traces are forwarded as evidence instead of being dropped.
+	LateSpanCheck bool `mapstructure:"late_span_check"`
+	// DecideOnEviction (H-8): a trace evicted because num_traces is exceeded is evaluated on the spans received
+	// so far (and forwarded if sampled) instead of being dropped silently.
+	DecideOnEviction bool `mapstructure:"decide_on_eviction"`
 }

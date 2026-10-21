@@ -1,0 +1,39 @@
+# Fan-out collector (otelcol-contrib, not measured): receives all telemetry of the shop, injects the
+# controlled declaration drift, and forwards an identical copy of every span to each sampler collector.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+processors:
+  batch: { send_batch_size: 512, timeout: 200ms }
+  # Drift injection: in 1/8 of all traces (trace id starts with hex 0 or 1) paymentservice reports the
+  # undeclared category "health data" instead of its instrumented category. Applied before fan-out, so the
+  # ground truth and every sampler see the same data. DRIFT_REGEX can disable it (e.g. "^$").
+  transform/drift:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["experiment.drift_injected"], true) where resource.attributes["service.name"] == "paymentservice" and attributes["tilt.dataDisclosed.category"] != nil and IsMatch(trace_id.string, "${env:DRIFT_REGEX}")
+          - set(attributes["tilt.dataDisclosed.category"], "health data") where attributes["experiment.drift_injected"] == true
+exporters:
+  nop:
+  otlp/none: &exp { endpoint: c-none:4317, tls: { insecure: true }, sending_queue: { queue_size: 20000 } }
+  otlp/head1: { <<: *exp, endpoint: c-head1:4317 }
+  otlp/head10: { <<: *exp, endpoint: c-head10:4317 }
+  otlp/tailprob: { <<: *exp, endpoint: c-tailprob:4317 }
+  otlp/tailpd: { <<: *exp, endpoint: c-tailpd:4317 }
+  otlp/tailthesis: { <<: *exp, endpoint: c-tailthesis:4317 }
+  otlp/transpthesis: { <<: *exp, endpoint: c-transpthesis:4317 }
+  otlp/transp: { <<: *exp, endpoint: c-transp:4317 }
+  otlp/transpstrict: { <<: *exp, endpoint: c-transpstrict:4317 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/drift, batch]
+      exporters: [otlp/none, otlp/head1, otlp/head10, otlp/tailprob, otlp/tailpd, otlp/tailthesis, otlp/transpthesis, otlp/transp, otlp/transpstrict]
+    metrics: { receivers: [otlp], exporters: [nop] }
+    logs: { receivers: [otlp], exporters: [nop] }

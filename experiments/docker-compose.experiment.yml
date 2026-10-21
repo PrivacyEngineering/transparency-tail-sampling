@@ -1,0 +1,123 @@
+# Experiment overlay: use together with ../deploy/docker-compose.yml, e.g.
+#   docker compose -f deploy/docker-compose.yml -f experiments/docker-compose.experiment.yml --profile experiment up -d
+# (experiments/run_experiment.sh does this). Services send to "fanout" (OTEL_COLLECTOR_HOST=fanout).
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "5m", max-file: "2" }
+services:
+  fanout:
+    image: ${CONTRIB_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { DRIFT_REGEX: "${DRIFT_REGEX:-^[01]}" }
+    volumes: ["../experiments/configs/fanout.yaml:/etc/otelcol/config.yaml:ro"]
+    ports: ["18880:8888"]
+    logging: *logging
+  sink:
+    image: ${CONTRIB_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    user: "0"
+    volumes:
+      - "../experiments/configs/sink.yaml:/etc/otelcol/config.yaml:ro"
+      - "${SINK_DIR:-../experiments/raw/sink}:/data"
+    logging: *logging
+  c-none:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-none.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18881:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-head1:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-head1.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18882:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-head10:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-head10.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18883:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-tailprob:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-tailprob.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18884:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-tailpd:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-tailpd.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18885:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-tailthesis:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-tailthesis.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18886:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-transpthesis:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-transpthesis.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18887:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-transp:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-transp.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18888:8888"]
+    depends_on: [sink]
+    logging: *logging
+  c-transpstrict:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [experiment]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILPROB_PCT: "${TAILPROB_PCT:-10}" }
+    volumes:
+      - "../experiments/configs/sampler-transpstrict.yaml:/etc/otelcol/config.yaml:ro"
+      - "${EXPERIMENT_TILT:-../tilt/tilt.corrected.json}:/etc/tilt/tilt.json:ro"
+    ports: ["18889:8888"]
+    depends_on: [sink]
+    logging: *logging

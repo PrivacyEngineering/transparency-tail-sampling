@@ -1,0 +1,21 @@
+# Sampler collector "none" (otel-transparency-collector image, identical binary for all configurations).
+# No sampling: ground truth stream and resource baseline.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  batch:
+
+exporters:
+  otlp:
+    endpoint: sink:4401
+    tls: { insecure: true }
+    sending_queue: { queue_size: 20000 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp]

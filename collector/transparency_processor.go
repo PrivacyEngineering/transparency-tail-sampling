@@ -43,6 +43,10 @@ type transparencyProcessor struct {
 	decisionBatcher idbatcher.Batcher
 	deleteChan      chan pcommon.TraceID
 	numTracesOnMap  *atomic.Uint64
+	// hardening (FIXES.md H-6, H-8); both false = thesis behaviour
+	lateSpanCheck    bool
+	decideOnEviction bool
+	lateCheckers     []sampling.LateSpanChecker
 }
 
 func newTransparencyProcessor(ctx context.Context, settings component.TelemetrySettings, nextConsumer consumer.Traces, cfg Config) (processor.Traces, error) {
@@ -84,12 +88,42 @@ func newTransparencyProcessor(ctx context.Context, settings component.TelemetryS
 		policies:        policies,
 		tickerFrequency: time.Second,
 		numTracesOnMap:  &atomic.Uint64{},
+		lateSpanCheck:    cfg.LateSpanCheck,
+		decideOnEviction: cfg.DecideOnEviction,
+	}
+	for _, p := range policies {
+		tsp.lateCheckers = append(tsp.lateCheckers, collectLateCheckers(p.evaluator)...)
 	}
 
 	tsp.policyTicker = &timeutils.PolicyTicker{OnTickFunc: tsp.samplingPolicyOnTick}
 	tsp.deleteChan = make(chan pcommon.TraceID, cfg.NumTraces)
 
 	return tsp, nil
+}
+
+// collectLateCheckers finds all LateSpanChecker policies, including those nested in composite/and policies.
+func collectLateCheckers(e sampling.PolicyEvaluator) []sampling.LateSpanChecker {
+	var out []sampling.LateSpanChecker
+	if lc, ok := e.(sampling.LateSpanChecker); ok {
+		out = append(out, lc)
+	}
+	if p, ok := e.(interface{ Children() []sampling.PolicyEvaluator }); ok {
+		for _, c := range p.Children() {
+			out = append(out, collectLateCheckers(c)...)
+		}
+	}
+	return out
+}
+
+// checkLate runs all LateSpanCheckers on late spans (H-6) and reports whether any found a violation.
+func (tsp *transparencyProcessor) checkLate(td ptrace.Traces) bool {
+	v := false
+	for _, lc := range tsp.lateCheckers {
+		if lc.CheckLateSpans(td) {
+			v = true
+		}
+	}
+	return v
 }
 
 func getPolicyEvaluator(settings component.TelemetrySettings, cfg *PolicyCfg) (sampling.PolicyEvaluator, error) {
@@ -185,6 +219,10 @@ func (tsp *transparencyProcessor) processTraces(resourceSpans ptrace.ResourceSpa
 				// Forward the spans to the policy destinations
 				traceTd := ptrace.NewTraces()
 				appendToTraces(traceTd, resourceSpans, spans)
+				if tsp.lateSpanCheck {
+					tsp.checkLate(traceTd) // H-6: annotate late spans too
+				}
+				stats.Record(tsp.ctx, statLateSpansForwarded.M(lenSpans))
 				if err := tsp.nextConsumer.ConsumeTraces(tsp.ctx, traceTd); err != nil {
 					tsp.logger.Warn(
 						"Error sending late arrived spans to destination",
@@ -192,6 +230,16 @@ func (tsp *transparencyProcessor) processTraces(resourceSpans ptrace.ResourceSpa
 				}
 			case sampling.NotSampled:
 				stats.Record(tsp.ctx, statLateSpanArrivalAfterDecision.M(int64(time.Since(actualData.DecisionTime)/time.Second)))
+				if tsp.lateSpanCheck {
+					traceTd := ptrace.NewTraces()
+					appendToTraces(traceTd, resourceSpans, spans)
+					if tsp.checkLate(traceTd) { // H-6: violating late spans are kept as evidence
+						stats.Record(tsp.ctx, statLateSpansForwarded.M(lenSpans))
+						_ = tsp.nextConsumer.ConsumeTraces(tsp.ctx, traceTd)
+						break
+					}
+				}
+				stats.Record(tsp.ctx, statLateSpansDropped.M(lenSpans))
 			default:
 				tsp.logger.Warn("Encountered unexpected sampling decision",
 					zap.Int("decision", int(finalDecision)))
@@ -229,6 +277,25 @@ func (tsp *transparencyProcessor) dropTrace(traceID pcommon.TraceID, deletionTim
 	if trace == nil {
 		tsp.logger.Error("Attempt to delete traceID not on table")
 		return
+	}
+
+	trace.Lock()
+	undecided := trace.FinalDecision == sampling.Unspecified
+	trace.Unlock()
+	if undecided {
+		stats.Record(tsp.ctx, statEvictedUndecided.M(1))
+		if tsp.decideOnEviction { // H-8: decide on the partial trace instead of dropping it silently
+			var m policyMetrics
+			decision, policy := tsp.makeDecision(traceID, trace, &m)
+			trace.Lock()
+			allSpans := trace.ReceivedBatches
+			trace.FinalDecision = decision
+			trace.ReceivedBatches = ptrace.NewTraces()
+			trace.Unlock()
+			if decision == sampling.Sampled {
+				_ = tsp.nextConsumer.ConsumeTraces(policy.ctx, allSpans)
+			}
+		}
 	}
 
 	stats.Record(tsp.ctx, statTraceRemovalAgeSec.M(int64(deletionTime.Sub(trace.ArrivalTime)/time.Second)))

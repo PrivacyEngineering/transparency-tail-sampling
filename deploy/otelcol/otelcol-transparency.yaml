@@ -1,0 +1,103 @@
+# Demo configuration of the otel-transparency-collector (thesis Listing 5.4 + Listing 5.5),
+# adapted from thesis-infrastructure charts/opentelemetry-demo/values.yaml (commit bd7037b) for docker compose.
+# Differences to the GKE deployment: exports to Tempo only (no Jaeger), no memory_limiter,
+# TILT document mounted from ../tilt (tilt_url option, see FIXES.md FIX-5).
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+  transparency:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      [
+        {
+          name: example-composite-policy,
+          type: composite,
+          composite:
+            {
+              max_total_spans_per_second: 1000,
+              policy_order: [tilt-check-policy, personal-data-category-policy, always-sample-policy],
+              composite_sub_policy:
+                [
+                  {
+                    name: tilt-check-policy,
+                    type: transparency_attribute,
+                    transparency_attribute: { tilt_url: "${env:TILT_URL}" },
+                  },
+                  {
+                    name: personal-data-category-policy,
+                    type: ottl_condition,
+                    ottl_condition: {
+                      error_mode: ignore,
+                      span: [ "attributes[\"tilt.dataDisclosed.category\"] != nil" ],
+                    },
+                  },
+                  { name: always-sample-policy, type: always_sample },
+                ],
+              rate_allocation:
+                [
+                  { policy: tilt-check-policy, percent: 50 },
+                  { policy: personal-data-category-policy, percent: 25 },
+                ],
+            },
+        },
+      ]
+
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+    dimensions_cache_size: 1000
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+    metrics_flush_interval: 15s
+  servicegraph:
+    latency_histogram_buckets: [5ms, 30ms, 100ms, 500ms, 2s]
+    dimensions:
+      - tilt.dataDisclosed.category
+      - tilt.dataDisclosed.purposes.purpose
+      - tilt.check_flag
+      - tilt.dataDisclosed.legalBases.reference
+    store:
+      ttl: 30s
+      max_items: 5000
+    virtual_node_peer_attributes:
+      - db.name
+      - rpc.service
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    resource_to_telemetry_conversion:
+      enabled: true
+    enable_open_metrics: true
+
+service:
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transparency, batch]
+      exporters: [otlp/tempo, spanmetrics, servicegraph]
+    metrics:
+      receivers: [otlp, spanmetrics, servicegraph]
+      processors: [batch]
+      exporters: [prometheus]

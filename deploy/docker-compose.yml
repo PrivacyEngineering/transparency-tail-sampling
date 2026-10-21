@@ -1,0 +1,254 @@
+# Resource-trimmed local deployment of the TILT-instrumented OpenTelemetry Astronomy Shop (thesis fork)
+# with the otel-transparency-collector. See ../README.md.
+#   docker compose --profile demo up -d          # shop + transparency collector + Tempo/Prometheus/Grafana
+#   (experiment profile is driven by ../experiments/run_experiment.sh)
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "5m", max-file: "2" }
+
+x-otel-env: &otel-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4317
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4317
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4317
+  OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: cumulative
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=opentelemetry-demo
+
+x-app: &app
+  platform: linux/amd64
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  # ---------------- TILT-instrumented services (thesis fork, see ../instrumentation) ----------------
+  cartservice:
+    <<: *app
+    image: ${IMAGE_NAME}:cartservice@sha256:fbaccfafd7b4bc101d4a94ba9067f4963457dd7b7500be9509fd9c23485254d7
+    environment:
+      <<: *otel-env
+      CART_SERVICE_PORT: "7070"
+      REDIS_ADDR: redis-cart:6379
+      OTEL_SERVICE_NAME: cartservice
+      ASPNETCORE_URLS: http://*:7070
+    deploy: { resources: { limits: { memory: 256M } } }
+    depends_on: [redis-cart]
+  checkoutservice:
+    <<: *app
+    image: ${IMAGE_NAME}:checkoutservice@sha256:36124b517ead60d0c653a4a428fee7408f85604074e6b162170271746de92aa2
+    environment:
+      <<: *otel-env
+      CHECKOUT_SERVICE_PORT: "5050"
+      CART_SERVICE_ADDR: cartservice:7070
+      CURRENCY_SERVICE_ADDR: currencyservice:7001
+      EMAIL_SERVICE_ADDR: http://emailservice:6060
+      PAYMENT_SERVICE_ADDR: paymentservice:50051
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalogservice:3550
+      SHIPPING_SERVICE_ADDR: shippingservice:50050
+      KAFKA_SERVICE_ADDR: kafka:9092
+      OTEL_SERVICE_NAME: checkoutservice
+    deploy: { resources: { limits: { memory: 128M } } }
+    depends_on:
+      kafka: { condition: service_healthy }
+      cartservice: { condition: service_started }
+      currencyservice: { condition: service_started }
+      emailservice: { condition: service_started }
+      paymentservice: { condition: service_started }
+      productcatalogservice: { condition: service_started }
+      shippingservice: { condition: service_started }
+  emailservice:
+    <<: *app
+    image: ${IMAGE_NAME}:emailservice@sha256:09ebaa362eec4e5109f972354252f6c9f7d2c18c45ebdcb10600fd7a0afd53c8
+    environment:
+      <<: *otel-env
+      APP_ENV: production
+      EMAIL_SERVICE_PORT: "6060"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4318/v1/traces
+      OTEL_SERVICE_NAME: emailservice
+    deploy: { resources: { limits: { memory: 160M } } }
+  paymentservice:
+    <<: *app
+    image: ${IMAGE_NAME}:paymentservice@sha256:232fe929164eff8bbd29ab7814e9761f2ca0e7a8106d8c256ac90afaf3615b5c
+    environment:
+      <<: *otel-env
+      PAYMENT_SERVICE_PORT: "50051"
+      OTEL_SERVICE_NAME: paymentservice
+    deploy: { resources: { limits: { memory: 256M } } }
+  shippingservice:
+    <<: *app
+    image: ${IMAGE_NAME}:shippingservice@sha256:7e702ed5d57fb67108473cf00cff31611194796a3f7a1a67ae4d8b54d6d74d77
+    environment:
+      <<: *otel-env
+      SHIPPING_SERVICE_PORT: "50050"
+      QUOTE_SERVICE_ADDR: http://quoteservice:8090
+      OTEL_SERVICE_NAME: shippingservice
+    deploy: { resources: { limits: { memory: 64M } } }
+
+  # ---------------- un-modified services on the request paths ----------------
+  frontend:
+    <<: *app
+    image: ${IMAGE_NAME}:frontend@sha256:6ecffe9cce28511e39b8cb4c0483986f3014dd570c17ac5c5db9c66896e7bf4d
+    environment:
+      <<: *otel-env
+      PORT: "8080"
+      FRONTEND_ADDR: frontend:8080
+      AD_SERVICE_ADDR: adservice:9555
+      CART_SERVICE_ADDR: cartservice:7070
+      CHECKOUT_SERVICE_ADDR: checkoutservice:5050
+      CURRENCY_SERVICE_ADDR: currencyservice:7001
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalogservice:3550
+      RECOMMENDATION_SERVICE_ADDR: recommendationservice:9001
+      SHIPPING_SERVICE_ADDR: shippingservice:50050
+      ENV_PLATFORM: local
+      OTEL_SERVICE_NAME: frontend
+      PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://localhost:4318/v1/traces
+      WEB_OTEL_SERVICE_NAME: frontend-web
+    ports: ["8080:8080"]
+    deploy: { resources: { limits: { memory: 512M } } }
+    depends_on: [cartservice, checkoutservice, currencyservice, productcatalogservice, recommendationservice, adservice, shippingservice]
+  productcatalogservice:
+    <<: *app
+    image: ${IMAGE_NAME}:productcatalogservice@sha256:e4440a08c6bdb6015887459ae4de13f4f1525bb9d9ac7c76a24661b711aedd52
+    environment:
+      <<: *otel-env
+      PRODUCT_CATALOG_SERVICE_PORT: "3550"
+      FEATURE_FLAG_GRPC_SERVICE_ADDR: featureflagservice:50053
+      OTEL_SERVICE_NAME: productcatalogservice
+    deploy: { resources: { limits: { memory: 64M } } }
+  currencyservice:
+    <<: *app
+    image: ${IMAGE_NAME}:currencyservice@sha256:fd8587d3577811684cccddad186fa6d24848d9490b22cc71ffbbe5836924aa04
+    environment:
+      <<: *otel-env
+      CURRENCY_SERVICE_PORT: "7001"
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=opentelemetry-demo,service.name=currencyservice
+    deploy: { resources: { limits: { memory: 64M } } }
+  quoteservice:
+    <<: *app
+    image: ${IMAGE_NAME}:quoteservice@sha256:b5ccdead9700518cb7de55578f52995d34dc436670738a082a508c43a4ab37eb
+    environment:
+      <<: *otel-env
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4318/v1/traces
+      OTEL_PHP_AUTOLOAD_ENABLED: "true"
+      QUOTE_SERVICE_PORT: "8090"
+      OTEL_SERVICE_NAME: quoteservice
+    deploy: { resources: { limits: { memory: 64M } } }
+  recommendationservice:
+    <<: *app
+    image: ${IMAGE_NAME}:recommendationservice@sha256:de8ef19e1dfaef5051ce91f53d158d693d2dd0863bedaf5674b810056aaf0c53
+    environment:
+      <<: *otel-env
+      RECOMMENDATION_SERVICE_PORT: "9001"
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalogservice:3550
+      FEATURE_FLAG_GRPC_SERVICE_ADDR: featureflagservice:50053
+      OTEL_PYTHON_LOG_CORRELATION: "true"
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_SERVICE_NAME: recommendationservice
+      PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+    deploy: { resources: { limits: { memory: 256M } } }
+  adservice:
+    <<: *app
+    image: ${IMAGE_NAME}:adservice@sha256:e964aea514db92f3905499a9ae368099a16f84e1b87673757171538cb77eb5fe
+    environment:
+      <<: *otel-env
+      AD_SERVICE_PORT: "9555"
+      FEATURE_FLAG_GRPC_SERVICE_ADDR: featureflagservice:50053
+      OTEL_SERVICE_NAME: adservice
+    deploy: { resources: { limits: { memory: 400M } } }
+  loadgenerator:
+    <<: *app
+    image: ${IMAGE_NAME}:loadgenerator@sha256:4ca4aa258edb2d6cb4726b7cd4268c66a7b95036223bee1070529dc0f6dd1499
+    profiles: [demo, load]
+    environment:
+      <<: *otel-env
+      LOCUST_WEB_PORT: "8089"
+      LOCUST_USERS: ${LOCUST_USERS}
+      LOCUST_SPAWN_RATE: ${LOCUST_SPAWN_RATE}
+      LOCUST_HOST: http://frontend:8080
+      LOCUST_HEADLESS: "false"
+      LOCUST_AUTOSTART: "true"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://${OTEL_COLLECTOR_HOST}:4318/v1/traces
+      OTEL_SERVICE_NAME: loadgenerator
+      PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+    ports: ["8089:8089"]
+    deploy: { resources: { limits: { memory: 512M } } }
+    depends_on: [frontend]
+
+  # ---------------- dependencies ----------------
+  featureflagservice:   # stub, see featureflag-stub/featureflag_stub.py (no tracing; flags always off)
+    <<: *app
+    image: ${IMAGE_NAME}:recommendationservice@sha256:de8ef19e1dfaef5051ce91f53d158d693d2dd0863bedaf5674b810056aaf0c53
+    entrypoint: ["python", "/stub/featureflag_stub.py"]
+    working_dir: /usr/src/app
+    environment: { PYTHONPATH: /usr/src/app }
+    volumes: ["./featureflag-stub:/stub:ro"]
+    deploy: { resources: { limits: { memory: 64M } } }
+  kafka:   # replaces the fork's kafka image (JVM-instrumented broker): single-node KRaft, native arm64
+    image: apache/kafka:3.9.1
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: -Xmx256m -Xms256m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      start_period: 20s
+      interval: 10s
+      timeout: 20s
+      retries: 12
+    deploy: { resources: { limits: { memory: 600M } } }
+  redis-cart:
+    image: redis:7
+    restart: unless-stopped
+    logging: *logging
+    deploy: { resources: { limits: { memory: 64M } } }
+
+  # ---------------- demo profile: transparency collector + observability backends ----------------
+  otelcol:
+    image: ${COLLECTOR_IMAGE}
+    profiles: [demo]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      TILT_URL: file:///etc/tilt/tilt.json
+    volumes:
+      - ./otelcol/otelcol-transparency.yaml:/etc/otelcol/config.yaml:ro
+      - ${TILT_FILE}:/etc/tilt/tilt.json:ro
+    ports: ["4317:4317", "4318:4318", "8888:8888", "9464:9464"]
+    restart: unless-stopped
+    logging: *logging
+  tempo:
+    image: grafana/tempo:2.8.2
+    profiles: [demo]
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes: ["./tempo/tempo.yaml:/etc/tempo.yaml:ro"]
+    ports: ["3200:3200"]
+    user: "0"
+    logging: *logging
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [demo]
+    command: ["--config.file=/etc/prometheus/prometheus.yaml", "--web.enable-remote-write-receiver"]
+    volumes: ["./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro"]
+    ports: ["9090:9090"]
+    logging: *logging
+  grafana:
+    image: grafana/grafana:12.0.2
+    profiles: [demo]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    logging: *logging

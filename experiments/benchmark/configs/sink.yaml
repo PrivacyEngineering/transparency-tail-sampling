@@ -1,0 +1,10 @@
+# Benchmark sink: accepts and discards everything (not measured).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 64 }
+exporters:
+  nop:
+service:
+  pipelines:
+    traces: { receivers: [otlp], exporters: [nop] }

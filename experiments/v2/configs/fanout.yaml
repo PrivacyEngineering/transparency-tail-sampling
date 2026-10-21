@@ -1,0 +1,47 @@
+# Fan-out collector v2 (otelcol-contrib 0.108, not measured).
+# 1) Injects three labelled drift classes into disjoint trace subsets (selected by the first hex digit of the trace id,
+#    1/16 of the eligible traces each; DRIFT_V1/V2/V3 regexes, "^$" disables a class):
+#    V1 undeclared category : paymentservice reports "health data" instead of its declared category
+#    V2 missing annotation  : paymentservice spans lose tilt.dataDisclosed.category
+#    V3 unlisted service    : productcatalogservice (absent from the TILT) server spans report "purchase history"
+#    Modified spans carry experiment.drift_class = V1|V2|V3.
+# 2) Exports the ground truth (gt) directly to the sink - before any memory_limiter/sampler - and an identical copy to each sampler.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+processors:
+  batch: { send_batch_size: 512, timeout: 200ms }
+  transform/drift:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["experiment.drift_class"], "V1") where resource.attributes["service.name"] == "paymentservice" and attributes["tilt.dataDisclosed.category"] != nil and IsMatch(trace_id.string, "${env:DRIFT_V1}")
+          - set(attributes["tilt.dataDisclosed.category"], "health data") where attributes["experiment.drift_class"] == "V1"
+          - set(attributes["experiment.drift_class"], "V2") where resource.attributes["service.name"] == "paymentservice" and attributes["tilt.dataDisclosed.category"] != nil and IsMatch(trace_id.string, "${env:DRIFT_V2}")
+          - delete_key(attributes, "tilt.dataDisclosed.category") where attributes["experiment.drift_class"] == "V2"
+          - set(attributes["experiment.drift_class"], "V3") where resource.attributes["service.name"] == "productcatalogservice" and kind == SPAN_KIND_SERVER and IsMatch(trace_id.string, "${env:DRIFT_V3}")
+          - set(attributes["tilt.dataDisclosed.category"], "purchase history") where attributes["experiment.drift_class"] == "V3"
+exporters:
+  nop:
+  otlp/gt: &exp { endpoint: sink:4400, tls: { insecure: true }, sending_queue: { queue_size: 50000 } }
+  otlp/none: { <<: *exp, endpoint: c2-none:4317 }
+  otlp/head1: { <<: *exp, endpoint: c2-head1:4317 }
+  otlp/head10: { <<: *exp, endpoint: c2-head10:4317 }
+  otlp/tailprob: { <<: *exp, endpoint: c2-tailprob:4317 }
+  otlp/tailthesis: { <<: *exp, endpoint: c2-tailthesis:4317 }
+  otlp/transpthesis: { <<: *exp, endpoint: c2-transpthesis:4317 }
+  otlp/transp: { <<: *exp, endpoint: c2-transp:4317 }
+  otlp/hardened: { <<: *exp, endpoint: c2-hardened:4317 }
+  otlp/hardenedcomp: { <<: *exp, endpoint: c2-hardenedcomp:4317 }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888 } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/drift, batch]
+      exporters: [otlp/gt, otlp/none, otlp/head1, otlp/head10, otlp/tailprob, otlp/tailthesis, otlp/transpthesis, otlp/transp, otlp/hardened, otlp/hardenedcomp]
+    metrics: { receivers: [otlp], exporters: [nop] }
+    logs: { receivers: [otlp], exporters: [nop] }

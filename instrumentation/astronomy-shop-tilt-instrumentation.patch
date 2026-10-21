@@ -1,0 +1,269 @@
+diff --git a/src/cartservice/src/services/CartService.cs b/src/cartservice/src/services/CartService.cs
+index 19ee141..677caa7 100644
+--- a/src/cartservice/src/services/CartService.cs
++++ b/src/cartservice/src/services/CartService.cs
+@@ -36,6 +36,11 @@ namespace cartservice.services
+             activity?.SetTag("app.user.id", request.UserId);
+             activity?.SetTag("app.product.id", request.Item.ProductId);
+             activity?.SetTag("app.product.quantity", request.Item.Quantity);
++            activity?.SetTag("tilt.dataDisclosed.category", "user id");
++            activity?.SetTag("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a");
++            activity?.SetTag("tilt.dataDisclosed.purposes.purpose", "To track the user's cart");
++
++
+ 
+             await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
+             return Empty;
+@@ -45,6 +50,10 @@ namespace cartservice.services
+         {
+             var activity = Activity.Current;
+             activity?.SetTag("app.user.id", request.UserId);
++            activity?.SetTag("tilt.dataDisclosed.category", "user id");
++            activity?.SetTag("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a");
++            activity?.SetTag("tilt.dataDisclosed.purposes.purpose", "To fetch the user's cart");
++
+             activity?.AddEvent(new("Fetch cart"));
+ 
+             var cart = await _cartStore.GetCartAsync(request.UserId);
+@@ -62,6 +71,10 @@ namespace cartservice.services
+         {
+             var activity = Activity.Current;
+             activity?.SetTag("app.user.id", request.UserId);
++            activity?.SetTag("tilt.dataDisclosed.category", "user id");
++            activity?.SetTag("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a");
++            activity?.SetTag("tilt.dataDisclosed.purposes.purpose", "To empty the user's cart");
++            
+             activity?.AddEvent(new("Empty cart"));
+ 
+             await _cartStore.EmptyCartAsync(request.UserId);
+diff --git a/src/checkoutservice/main.go b/src/checkoutservice/main.go
+index 0cd8577..6b1689f 100644
+--- a/src/checkoutservice/main.go
++++ b/src/checkoutservice/main.go
+@@ -214,6 +214,10 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
+ 	span.SetAttributes(
+ 		attribute.String("app.user.id", req.UserId),
+ 		attribute.String("app.user.currency", req.UserCurrency),
++
++		attribute.String("tilt.dataDisclosed.category", "user id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "user id for order placement"),
+ 	)
+ 	log.Infof("[PlaceOrder] user_id=%q user_currency=%q", req.UserId, req.UserCurrency)
+ 
+@@ -249,8 +253,7 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
+ 		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
+ 	}
+ 	log.Infof("payment went through (transaction_id: %s)", txID)
+-	span.AddEvent("charged",
+-		trace.WithAttributes(attribute.String("app.payment.transaction.id", txID)))
++	span.AddEvent("charged", trace.WithAttributes(attribute.String("app.payment.transaction.id", txID)))
+ 
+ 	shippingTrackingID, err := cs.shipOrder(ctx, req.Address, prep.cartItems)
+ 	if err != nil {
+@@ -277,6 +280,11 @@ func (cs *checkoutService) PlaceOrder(ctx context.Context, req *pb.PlaceOrderReq
+ 		attribute.Float64("app.shipping.amount", shippingCostFloat),
+ 		attribute.Float64("app.order.amount", totalPriceFloat),
+ 		attribute.Int("app.order.items.count", len(prep.orderItems)),
++
++		attribute.String("tilt.dataDisclosed.category", "order id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "order id is required to fulfill the order"),
++
+ 		shippingTrackingAttribute,
+ 	)
+ 
+@@ -347,6 +355,34 @@ func createClient(ctx context.Context, svcAddr string) (*grpc.ClientConn, error)
+ 	)
+ }
+ 
++func createPaymentClient(ctx context.Context, svcAddr string) (*grpc.ClientConn, error) {
++	span := trace.SpanFromContext(ctx)
++	span.SetAttributes(
++		attribute.String("tilt.dataDisclosed.category", "transaction id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-6-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "transaction id for order placement"),
++	)
++	return grpc.DialContext(ctx, svcAddr,
++		grpc.WithTransportCredentials(insecure.NewCredentials()),
++		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
++		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
++	)
++}
++
++func createShipmentClient(ctx context.Context, svcAddr string) (*grpc.ClientConn, error) {
++	span := trace.SpanFromContext(ctx)
++	span.SetAttributes(
++		attribute.String("tilt.dataDisclosed.category", "tracking id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-8-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "tracking id for order placement"),
++	)
++	return grpc.DialContext(ctx, svcAddr,
++		grpc.WithTransportCredentials(insecure.NewCredentials()),
++		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
++		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
++	)
++}
++
+ func (cs *checkoutService) quoteShipping(ctx context.Context, address *pb.Address, items []*pb.CartItem) (*pb.Money, error) {
+ 	conn, err := createClient(ctx, cs.shippingSvcAddr)
+ 	if err != nil {
+@@ -372,6 +408,15 @@ func (cs *checkoutService) getUserCart(ctx context.Context, userID string) ([]*p
+ 	defer conn.Close()
+ 
+ 	cart, err := pb.NewCartServiceClient(conn).GetCart(ctx, &pb.GetCartRequest{UserId: userID})
++	span := trace.SpanFromContext(ctx)
++	span.SetAttributes(
++		attribute.String("app.user.id", userID),
++
++		attribute.String("tilt.dataDisclosed.category", "user id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-6-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "user id getting user cart"),
++	)
++
+ 	if err != nil {
+ 		return nil, fmt.Errorf("failed to get user cart during checkout: %+v", err)
+ 	}
+@@ -433,10 +478,18 @@ func (cs *checkoutService) convertCurrency(ctx context.Context, from *pb.Money,
+ }
+ 
+ func (cs *checkoutService) chargeCard(ctx context.Context, amount *pb.Money, paymentInfo *pb.CreditCardInfo) (string, error) {
+-	conn, err := createClient(ctx, cs.paymentSvcAddr)
++	ctx, span := tracer.Start(ctx, "chargeCard")
++	defer span.End()
++
++	conn, err := createPaymentClient(ctx, cs.paymentSvcAddr)
+ 	if err != nil {
+ 		return "", fmt.Errorf("failed to connect payment service: %+v", err)
+ 	}
++	span.SetAttributes(
++		attribute.String("tilt.dataDisclosed.category", "transaction id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-6-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "transaction id for order placement"),
++	)
+ 	defer conn.Close()
+ 
+ 	paymentResp, err := pb.NewPaymentServiceClient(conn).Charge(ctx, &pb.ChargeRequest{
+@@ -445,10 +498,18 @@ func (cs *checkoutService) chargeCard(ctx context.Context, amount *pb.Money, pay
+ 	if err != nil {
+ 		return "", fmt.Errorf("could not charge the card: %+v", err)
+ 	}
++
+ 	return paymentResp.GetTransactionId(), nil
+ }
+ 
+ func (cs *checkoutService) sendOrderConfirmation(ctx context.Context, email string, order *pb.OrderResult) error {
++	span := trace.SpanFromContext(ctx)
++	span.SetAttributes(
++		attribute.String("app.user.email", email),
++		attribute.String("tilt.dataDisclosed.category", "customer email"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "To send order confirmation email"),
++	)
+ 	emailServicePayload, err := json.Marshal(map[string]interface{}{
+ 		"email": email,
+ 		"order": order,
+@@ -471,7 +532,9 @@ func (cs *checkoutService) sendOrderConfirmation(ctx context.Context, email stri
+ }
+ 
+ func (cs *checkoutService) shipOrder(ctx context.Context, address *pb.Address, items []*pb.CartItem) (string, error) {
+-	conn, err := createClient(ctx, cs.shippingSvcAddr)
++	ctx, span := tracer.Start(ctx, "shipOrder")
++	defer span.End()
++	conn, err := createShipmentClient(ctx, cs.shippingSvcAddr)
+ 	if err != nil {
+ 		return "", fmt.Errorf("failed to connect email service: %+v", err)
+ 	}
+@@ -482,6 +545,11 @@ func (cs *checkoutService) shipOrder(ctx context.Context, address *pb.Address, i
+ 	if err != nil {
+ 		return "", fmt.Errorf("shipment failed: %+v", err)
+ 	}
++	span.SetAttributes(
++		attribute.String("tilt.dataDisclosed.category", "tracking id"),
++		attribute.String("tilt.dataDisclosed.legalBases.reference", "GDPR-8-1-a"),
++		attribute.String("tilt.dataDisclosed.purposes.purpose", "tracking id for order placement"),
++	)
+ 	return resp.GetTrackingId(), nil
+ }
+ 
+diff --git a/src/emailservice/email_server.rb b/src/emailservice/email_server.rb
+index 6df006e..ee4e0c5 100644
+--- a/src/emailservice/email_server.rb
++++ b/src/emailservice/email_server.rb
+@@ -33,6 +33,10 @@ post "/send_order_confirmation" do
+   current_span = OpenTelemetry::Trace.current_span
+   current_span.add_attributes({
+     "app.order.id" => data.order.order_id,
++    "app.email.recipient" => data.email,
++    "tilt.dataDisclosed.category" => "customer email",
++    "tilt.dataDisclosed.legalBases.reference" => "GDPR-99-1-a",
++    "tilt.dataDisclosed.purposes.purpose" => "To send order confirmation email"
+   })
+ 
+   send_email(data)
+@@ -54,7 +58,6 @@ def send_email(data)
+       body:     erb(:confirmation, locals: { order: data.order }),
+       via:      :test
+     )
+-    span.set_attribute("app.email.recipient", data.email)
+     puts "Order confirmation email sent to: #{data.email}"
+   end
+   # manually created spans need to be ended
+diff --git a/src/paymentservice/charge.js b/src/paymentservice/charge.js
+index 1072863..5194c29 100644
+--- a/src/paymentservice/charge.js
++++ b/src/paymentservice/charge.js
+@@ -39,7 +39,10 @@ module.exports.charge = request => {
+ 
+   span.setAttributes({
+     'app.payment.card_type': cardType,
+-    'app.payment.card_valid': valid
++    'app.payment.card_valid': valid,
++    'tilt.dataDisclosed.category': 'Credit Card',
++    'tilt.dataDisclosed.legalBases.reference': 'GDPR-6(1)(b)',
++    'tilt.dataDisclosed.purposes.purpose': 'Processing is necessary for the performance of a contract to which the data subject is party or in order to take steps at the request of the data subject prior to entering into a contract.',
+   });
+ 
+   if (!valid) {
+diff --git a/src/paymentservice/index.js b/src/paymentservice/index.js
+index bb5ed34..6e981e1 100644
+--- a/src/paymentservice/index.js
++++ b/src/paymentservice/index.js
+@@ -25,8 +25,12 @@ function chargeServiceHandler(call, callback) {
+ 
+   try {
+     const amount = call.request.amount
++
+     span.setAttributes({
+-      'app.payment.amount': parseFloat(`${amount.units}.${amount.nanos}`)
++      'app.payment.amount': parseFloat(`${amount.units}.${amount.nanos}`),
++      'tilt.dataDisclosed.category': 'Credit Card',
++      'tilt.dataDisclosed.legalBases.reference': 'GDPR-6(1)(b)',
++      'tilt.dataDisclosed.purposes.purpose': 'Processing is necessary for the performance of a contract to which the data subject is party or in order to take steps at the request of the data subject prior to entering into a contract.',
+     })
+     logger.info({ request: call.request }, "Charge request received.")
+ 
+diff --git a/src/shippingservice/src/shipping_service.rs b/src/shippingservice/src/shipping_service.rs
+index 2db16f1..0c6307e 100644
+--- a/src/shippingservice/src/shipping_service.rs
++++ b/src/shippingservice/src/shipping_service.rs
+@@ -72,6 +72,9 @@ impl ShippingService for ShippingServer {
+ 
+         span.add_event("Processing get quote request".to_string(), vec![]);
+         span.set_attribute(KeyValue::new("app.shipping.zip_code", request_message.address.unwrap().zip_code));
++        span.set_attribute(KeyValue::new("tilt.dataDisclosed.category", "user address"));
++        span.set_attribute(KeyValue::new("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a"));
++        span.set_attribute(KeyValue::new("tilt.dataDisclosed.purposes.purpose", "To ship the order to the customer"));
+ 
+         let cx = Context::current_with_span(span);
+         let q = match create_quote_from_count(itemct)
+@@ -113,6 +116,9 @@ impl ShippingService for ShippingServer {
+ 
+         let tid = create_tracking_id();
+         span.set_attribute(KeyValue::new("app.shipping.tracking.id", tid.clone()));
++        span.set_attribute(KeyValue::new("tilt.dataDisclosed.category", "tracking id"));
++        span.set_attribute(KeyValue::new("tilt.dataDisclosed.legalBases.reference", "GDPR-99-1-a"));
++        span.set_attribute(KeyValue::new("tilt.dataDisclosed.purposes.purpose", "To ship the order to the customer"));
+         info!("Tracking ID Created: {}", tid);
+ 
+         span.add_event(

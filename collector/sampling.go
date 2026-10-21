@@ -74,9 +74,11 @@ func (tsp *transparencyProcessor) makeDecision(id pcommon.TraceID, trace *sampli
 	for i, p := range tsp.policies {
 		policyEvaluateStartTime := time.Now()
 		decision, err := p.evaluator.Evaluate(p.ctx, id, trace)
+		elapsed := time.Since(policyEvaluateStartTime)
 		stats.Record(
 			p.ctx,
-			statDecisionLatencyMicroSec.M(int64(time.Since(policyEvaluateStartTime)/time.Microsecond)))
+			statDecisionLatencyMicroSec.M(int64(elapsed/time.Microsecond)),
+			statDecisionLatencyNs.M(int64(elapsed))) // added: ns resolution (the µs metric truncates)
 
 		if err != nil {
 			samplingDecision[sampling.Error] = true

@@ -1,0 +1,18 @@
+# B0: pass-through baseline (no sampling).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 64 }
+processors:
+  batch:
+exporters:
+  otlp:
+    endpoint: sink:4317
+    tls: { insecure: true }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp]
