@@ -4,7 +4,7 @@ dist:
   otelcol_version: "0.80.0"
   output_path: /tmp/otelcol
   version: "0.1.0"
-  go: "/usr/local/bin/go" # On MacOS, installed with `brew`.
+  go: "/usr/local/go/bin/go" # FIX-2: path of the Go binary inside the golang build image
 
 receivers:
   - gomod:
@@ -24,7 +24,7 @@ extensions:
 
 processors:
   - import: github.com/akkbng/otel-transparency-collector
-    gomod: github.com/akkbng/otel-transparency-collector main
+    gomod: github.com/akkbng/otel-transparency-collector v0.0.0 # FIX-4: "main" is not a semver; the module is replaced by /build below
     name: transparencyprocessor
   - gomod:
       go.opentelemetry.io/collector/processor/batchprocessor v0.80.0
@@ -36,7 +36,9 @@ processors:
       github.com/open-telemetry/opentelemetry-collector-contrib/processor/spanmetricsprocessor v0.80.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.80.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/servicegraphprocessor v0.80.0
-  #- gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.80.0
+  # ADD-1 (experiment only): upstream samplers in the same binary, so all sampling configurations run on an identical distribution
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.80.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/probabilisticsamplerprocessor v0.80.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.80.0
 
 
