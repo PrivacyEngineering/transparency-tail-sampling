@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 # B3: HARDENED composite (tilt_conformity: exact match, V3, sha256-pinned TILT over HTTP; V1/V3 evidence unbudgeted;
 # V2 25 %, PD presence 25 %, always_sample remaining 50 %; fall-through; global budget; late-span check; decide on eviction).
 receivers:

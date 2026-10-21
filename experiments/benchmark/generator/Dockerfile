@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 FROM golang:1.20-alpine AS build
 WORKDIR /src
 COPY . .

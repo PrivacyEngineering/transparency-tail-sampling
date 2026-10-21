@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Stream `docker stats` for one container (~1 sample/s) into a long-format CSV until killed.
 Usage: python3 stats_stream.py CONTAINER OUT.csv LABEL"""
 import csv, json, re, subprocess, sys, time

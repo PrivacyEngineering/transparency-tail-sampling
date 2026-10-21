@@ -1,3 +1,4 @@
+// Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 // tiltgen: synthetic OTLP/gRPC trace generator for the collector benchmark.
 //
 // Emits multi-span traces that mimic the request types of the instrumented Astronomy Shop:

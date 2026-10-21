@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 # Collector performance benchmark (run on an otherwise idle Docker host: stop the shop first).
-# Usage: experiments/benchmark/run_benchmark.sh REPS "CONFIGS" "LOADS" [WARMUP_S=20] [STEADY_S=120]
+# Usage: experiments/benchmark/run_benchmark.sh REPS "CONFIGS" "LOADS" [WARMUP_S=35] [STEADY_S=45]
 #   e.g. experiments/benchmark/run_benchmark.sh 3 "B0-none B1-tailsampling-thesis" "500 1000" 20 120
 # Env BENCH_SET (default "sweep") names the series. Raw output: experiments/raw/benchmark/$BENCH_SET/<config>/<load>/rep<k>/
 # (cells that already have done.txt are skipped, so an interrupted series can be resumed).
 set -euo pipefail
-REPS=$1; CONFIGS=$2; LOADS=$3; WARMUP=${4:-20}; STEADY=${5:-120}
+REPS=$1; CONFIGS=$2; LOADS=$3; WARMUP=${4:-35}; STEADY=${5:-45}
 HERE=$(cd "$(dirname "$0")" && pwd); ROOT=$(cd "$HERE/../.." && pwd)
 DC="docker compose -f $HERE/docker-compose.benchmark.yml"
 for rep in $(seq 1 "$REPS"); do

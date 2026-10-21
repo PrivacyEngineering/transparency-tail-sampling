@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 # B1: contrib tail_sampling processor with the thesis base-benchmark composite policy (thesis Listing 6.1).
 receivers:
   otlp:

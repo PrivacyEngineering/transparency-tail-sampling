@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 # B2-off: CHECK OFF (transparency_attribute.disabled: true, always NotSampled) - otherwise identical to B2.
 # B2: transparency processor with the thesis transparency composite configuration (thesis Listing 5.4); TILT served over HTTP.
 receivers:

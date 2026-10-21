@@ -1,3 +1,4 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Analyse benchmark raw data (experiments/raw/benchmark/<config>/<load>/rep<k>) -> tidy CSV + JSON summary.
 
 Usage: python3 analyze_benchmark.py RAW_DIR OUT_DIR
@@ -129,7 +130,7 @@ def main(raw, out):
         lo, hi = ci95(xs)
         summ[c][l][mname] = {"mean": statistics.mean(xs), "sd": statistics.stdev(xs) if len(xs) > 1 else 0.0, "n": len(xs),
                              "ci95_low": lo, "ci95_high": hi, "unit": units[mname]}
-    json.dump(summ, open(os.path.join(out, "benchmark_summary.json"), "w"), indent=1)
+    json.dump(summ, open(os.path.join(out, "summary.json"), "w"), indent=1)
 
 
 if __name__ == "__main__":
