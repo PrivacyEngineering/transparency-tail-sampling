@@ -1,0 +1,29 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+# rare-drift sweep config 'tailrandom': contrib tail_sampling, probabilistic policy. TAILRANDOM_PCT is set so that the
+# retained span volume matches TATS at the same offered load (pilot, see experiments/README.md).
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 64 }
+processors:
+  batch:
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 50000
+    expected_new_traces_per_sec: 0
+    policies:
+      - name: probabilistic-matched
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:TAILRANDOM_PCT}
+exporters:
+  otlp:
+    endpoint: rdsink:4317
+    tls: { insecure: true }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [tail_sampling, batch]
+      exporters: [otlp]

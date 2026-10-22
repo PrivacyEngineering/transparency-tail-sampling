@@ -1,0 +1,28 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+# Rare-drift stack: collector under test (2 CPUs, 2 GiB, as in the benchmark), recording sink, TILT server, generator.
+# Driven by run_raredrift.sh; RD_CONFIG selects configs/<RD_CONFIG>.yaml, RD_OUT is the host dir for the sink's TSV.
+name: ttsrd
+services:
+  collector:
+    image: otel-transparency-collector:dev
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment: { TAILRANDOM_PCT: "${TAILRANDOM_PCT:-20}" }
+    volumes: ["./configs/${RD_CONFIG:-tats}.yaml:/etc/otelcol/config.yaml:ro"]
+    ports: ["19889:8888"]
+    cpus: 2
+    mem_limit: 2g
+    memswap_limit: 2g
+    depends_on: [rdsink, tilt-server]
+  rdsink:
+    image: rdtool:dev
+    command: ["sink", "-listen", ":4317", "-out", "/data/retained.tsv"]
+    volumes: ["${RD_OUT:-/tmp/rd_out}:/data"]
+    cpus: 2
+  tilt-server:
+    image: nginx:alpine
+    volumes: ["../../tilt/tilt.corrected.json:/usr/share/nginx/html/tilt.json:ro"]
+  generator:
+    image: rdtool:dev
+    profiles: [gen]
+    volumes: ["${RD_OUT:-/tmp/rd_out}:/data"]
+    cpus: 4

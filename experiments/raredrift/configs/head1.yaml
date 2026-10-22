@@ -1,0 +1,22 @@
+# Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
+# rare-drift sweep config 'head1': head-based-equivalent probabilistic sampling (trace-id hash), 1 %.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317, max_recv_msg_size_mib: 64 }
+processors:
+  batch:
+  probabilistic_sampler:
+    sampling_percentage: 1
+    hash_seed: 22
+exporters:
+  otlp:
+    endpoint: rdsink:4317
+    tls: { insecure: true }
+service:
+  telemetry: { metrics: { address: 0.0.0.0:8888, level: detailed } }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [probabilistic_sampler, batch]
+      exporters: [otlp]
