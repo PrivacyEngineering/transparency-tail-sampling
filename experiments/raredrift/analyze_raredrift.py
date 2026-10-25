@@ -1,7 +1,10 @@
 # Parts of this file were developed with the assistance of Claude (Anthropic) and reviewed by the authors.
 """Analyse the rare-drift sweep: RAW_DIR/<config>/<class>/p<P>/rep<k>/ -> tidy long CSV, per-event CSV, summary.json.
 
-Usage: python3 analyze_raredrift.py RAW_DIR OUT_DIR [WINDOW_S=60]
+Usage: python3 analyze_raredrift.py RAW_DIR OUT_DIR [WINDOW_S=60] [--merge-long OLD.csv --merge-events OLD.csv.gz]
+With --merge-long/--merge-events, per-cell rows of earlier phases (whose raw files are gone) are merged with the newly analysed
+cells before the summary is recomputed; a (config, class, p, rep) present in both is an error. summary.json gets a
+"_provenance" entry listing which reps came from the merged (old) file and which from RAW_DIR.
 Per cell (config, drift class, p, rep):
   injected / detected (>=1 retained trace carrying the injected drift), recall = detected/injected,
   detection probability within fixed non-overlapping windows of WINDOW_S seconds (a window counts if it contains >=1 injected
@@ -102,14 +105,28 @@ def cell(d, window):
     return m, events
 
 
-def main(raw, out, window=60):
+def main(raw, out, window=60, merge_long=None, merge_events=None):
     os.makedirs(out, exist_ok=True)
     rows, evrows = [], []
+    old_keys = set()
+    if merge_long:
+        for r in csv.DictReader(open(merge_long)):
+            r["p"] = float(r["p"]); r["rep"] = int(r["rep"]); r["value"] = float(r["value"])
+            rows.append(r); old_keys.add((r["config"], r["drift_class"], r["p"], r["rep"]))
+    if merge_events:
+        with gzip.open(merge_events, "rt", newline="") as f:
+            for r in csv.DictReader(f):
+                r["p"] = float(r["p"]); r["rep"] = int(r["rep"]); r["retained"] = int(r["retained"])
+                evrows.append(r)
+    new_keys = set()
     for d in sorted(glob.glob(os.path.join(raw, "*", "V*", "p*", "rep*"))):
         if not os.path.exists(os.path.join(d, "done.txt")):
             continue
         rep = int(d.rsplit("rep", 1)[1]); p = float(os.path.basename(os.path.dirname(d))[1:])
         cls = os.path.basename(os.path.dirname(os.path.dirname(d))); cfg = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(d))))
+        if (cfg, cls, p, rep) in old_keys:
+            raise SystemExit(f"duplicate cell in merged data: {cfg} {cls} p={p} rep={rep}")
+        new_keys.add((cfg, cls, p, rep))
         m, events = cell(d, window)
         for k, (v, u) in m.items():
             rows.append({"config": cfg, "label": LABEL[cfg], "drift_class": cls, "p": p, "rep": rep, "metric": k, "value": v, "unit": u})
@@ -135,6 +152,11 @@ def main(raw, out, window=60):
             k = sum(r["value"] for r in rows if r["config"] == c and r["drift_class"] == cls and r["p"] == p and r["metric"] == "detected")
             wl, wh = wilson(k, i)
             cellk["recall_pooled"] = {"injected": i, "detected": k, "recall": k / i if i else float("nan"), "wilson95_low": wl, "wilson95_high": wh}
+    prov = {"old_file_cells": {}, "new_raw_cells": {}}
+    for tag, keys in (("old_file_cells", old_keys), ("new_raw_cells", new_keys)):
+        for c, cls, p, rep in sorted(keys, key=lambda k: (ORDER.index(k[0]), k[1], -k[2], k[3])):
+            prov[tag].setdefault(f"{c}/{cls}/p={p:g}", []).append(rep)
+    summ["_provenance"] = prov
     json.dump(summ, open(os.path.join(out, "summary.json"), "w"), indent=1)
     # compact markdown table for README / notes
     with open(os.path.join(out, "summary_table.md"), "w") as f:
@@ -151,4 +173,9 @@ def main(raw, out, window=60):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], float(sys.argv[3]) if len(sys.argv) > 3 else 60)
+    a = sys.argv[1:]
+    opt = {}
+    for flag in ("--merge-long", "--merge-events"):
+        if flag in a:
+            i = a.index(flag); opt[flag] = a[i + 1]; del a[i:i + 2]
+    main(a[0], a[1], float(a[2]) if len(a) > 2 else 60, opt.get("--merge-long"), opt.get("--merge-events"))
