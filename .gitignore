@@ -4,3 +4,7 @@ experiments/raw/
 __pycache__/
 *.pyc
 .venv/
+
+# Experiment outputs stay local (results are kept in a separate private repository)
+experiments/results/
+experiments/raw/

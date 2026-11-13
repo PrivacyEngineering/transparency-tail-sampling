@@ -1,5 +1,5 @@
 # Multi-stage build of the otel-transparency-collector distribution with the
-# OpenTelemetry Collector Builder (ocb). See ../FIXES.md for why each line
+# OpenTelemetry Collector Builder (ocb). See the FIX-n entries in ../README.md for why each line
 # differs from the original thesis Dockerfile.
 FROM golang:1.20-alpine AS builder
 

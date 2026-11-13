@@ -45,7 +45,7 @@ type transparencyProcessor struct {
 	decisionBatcher idbatcher.Batcher
 	deleteChan      chan pcommon.TraceID
 	numTracesOnMap  *atomic.Uint64
-	// hardening (FIXES.md H-6, H-8); both false = thesis behaviour
+	// hardening (H-6, H-8, see README.md); both false = original behaviour
 	lateSpanCheck    bool
 	decideOnEviction bool
 	lateCheckers     []sampling.LateSpanChecker

@@ -2,7 +2,7 @@
 
 package sampling
 
-// tilt_conformity: HARDENED variant of the thesis transparency_attribute policy (see FIXES.md, H-1 .. H-7).
+// tilt_conformity: HARDENED variant of the thesis transparency_attribute policy (changes H-1 .. H-7, see README.md).
 // The thesis policy (transparency_tag_filter.go) is left unchanged so that both can be compared with one binary.
 
 import (

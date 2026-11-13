@@ -26,7 +26,7 @@ type subpolicy struct {
 	unbudgeted bool
 }
 
-// CompositeOptions are hardening switches (all false = upstream/thesis behaviour). See FIXES.md H-7.
+// CompositeOptions are hardening switches (all false = upstream/original behaviour). See H-7 in README.md.
 type CompositeOptions struct {
 	// FallThrough: a sub-policy that votes Sampled but is over budget does not end the evaluation;
 	// the next sub-policy is evaluated (H-7a).

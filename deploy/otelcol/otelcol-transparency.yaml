@@ -1,7 +1,7 @@
 # Demo configuration of the otel-transparency-collector (thesis Listing 5.4 + Listing 5.5),
 # adapted from thesis-infrastructure charts/opentelemetry-demo/values.yaml (commit bd7037b) for docker compose.
 # Differences to the GKE deployment: exports to Tempo only (no Jaeger), no memory_limiter,
-# TILT document mounted from ../tilt (tilt_url option, see FIXES.md FIX-5).
+# TILT document mounted from ../tilt (tilt_url option, change FIX-5 in README.md).
 receivers:
   otlp:
     protocols:

@@ -37,7 +37,7 @@ const (
 
 	// TransparencyAttribute sample traces based on their tilt checks and service dependency paths
 	TransparencyAttribute PolicyType = "transparency_attribute"
-	// TiltConformity is the hardened TILT conformity policy (not in the thesis; see FIXES.md H-1..H-6).
+	// TiltConformity is the hardened TILT conformity policy (H-1..H-6, see README.md).
 	TiltConformity PolicyType = "tilt_conformity"
 )
 
@@ -127,7 +127,7 @@ type CompositeCfg struct {
 	PolicyOrder            []string                `mapstructure:"policy_order"`
 	SubPolicyCfg           []CompositeSubPolicyCfg `mapstructure:"composite_sub_policy"`
 	RateAllocation         []RateAllocationCfg     `mapstructure:"rate_allocation"`
-	// Hardening switches (default false = thesis/upstream behaviour), see FIXES.md H-7.
+	// Hardening switches (default false = original/upstream behaviour), H-7 in README.md.
 	FallThrough               bool     `mapstructure:"fall_through"`
 	UnallocatedShareRemaining bool     `mapstructure:"unallocated_share_remaining"`
 	EnforceTotalBudget        bool     `mapstructure:"enforce_total_budget"`
